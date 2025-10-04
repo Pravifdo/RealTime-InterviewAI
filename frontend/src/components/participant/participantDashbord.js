@@ -82,7 +82,7 @@ function ParticipantDashboard() {
             <div className="button-group">
               <button
                 className="join-btn"
-                onClick={() => navigate("/join-interview")}
+                onClick={() => navigate("/join-participant")}
               >
                 🚀 Join Interview
               </button>
