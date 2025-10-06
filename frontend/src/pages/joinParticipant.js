@@ -1,123 +1,222 @@
 import React, { useState, useEffect, useRef } from "react";
 import { FaMicrophone, FaMicrophoneSlash, FaVideo, FaVideoSlash } from "react-icons/fa";
-import "../styles/JoinParticipant.css";
+import { io } from "socket.io-client";
+import { useWebRTC } from "../hooks/useWebRTC";
 
-function JoinParticipant() {
-  const [participantMic, setParticipantMic] = useState(true);
-  const [participantCam, setParticipantCam] = useState(true);
+const socket = io("http://localhost:5000");
+const ROOM_ID = "interview-room"; // Same room as interviewer
+
+export default function JoinParticipant() {
+  const [micOn, setMicOn] = useState(true);
+  const [camOn, setCamOn] = useState(true);
+  const [time, setTime] = useState(0);
   const [answer, setAnswer] = useState("");
-  const [sentAnswers, setSentAnswers] = useState([]);
-  const [timer, setTimer] = useState(0);
+  const [questions, setQuestions] = useState([]);
+  const [interviewerState, setInterviewerState] = useState({ camOn: true, micOn: true });
 
-  const participantVideoRef = useRef(null);
-  const interviewerVideoRef = useRef(null);
-  const participantStreamRef = useRef(null);
-  const timerRef = useRef(null);
+  const localVideoRef = useRef(null);
+  const remoteVideoRef = useRef(null);
 
-  // Timer
+  // Initialize WebRTC (participant is NOT the initiator)
+  const {
+    localStream,
+    remoteStream,
+    isConnected,
+    error,
+    initLocalStream,
+    toggleVideo,
+    toggleAudio,
+    cleanup,
+  } = useWebRTC(socket, ROOM_ID, false);
+
+  // Initialize local stream on mount
   useEffect(() => {
-    timerRef.current = setInterval(() => setTimer((t) => t + 1), 1000);
-    return () => clearInterval(timerRef.current);
-  }, []);
-
-  // Participant Camera & Mic
-  useEffect(() => {
-    navigator.mediaDevices
-      .getUserMedia({ video: participantCam, audio: participantMic })
-      .then((stream) => {
-        participantStreamRef.current = stream;
-        if (participantVideoRef.current)
-          participantVideoRef.current.srcObject = stream;
-      })
-      .catch(console.error);
+    initLocalStream(camOn, micOn);
 
     return () => {
-      if (participantStreamRef.current) {
-        participantStreamRef.current.getTracks().forEach((track) => track.stop());
-      }
+      cleanup();
     };
-  }, [participantCam, participantMic]);
-
-  // Interviewer feed (simulated)
-  useEffect(() => {
-    navigator.mediaDevices
-      .getUserMedia({ video: true, audio: false })
-      .then((stream) => {
-        if (interviewerVideoRef.current)
-          interviewerVideoRef.current.srcObject = stream;
-      })
-      .catch(console.error);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const handleSendAnswer = () => {
-    if (!answer.trim()) return;
-    setSentAnswers((prev) => [...prev, answer]);
+  // Update local video element
+  useEffect(() => {
+    if (localVideoRef.current && localStream) {
+      localVideoRef.current.srcObject = localStream;
+    }
+  }, [localStream]);
+
+  // Update remote video element
+  useEffect(() => {
+    if (remoteVideoRef.current && remoteStream) {
+      remoteVideoRef.current.srcObject = remoteStream;
+    }
+  }, [remoteStream]);
+
+  useEffect(() => {
+    socket.on("update-interviewer", setInterviewerState);
+    socket.on("new-question", q => setQuestions(prev => [...prev, q]));
+    socket.on("meeting-status", data => setTime(data.time));
+    socket.on("meeting-ended", () => {
+      alert("Interview ended by interviewer");
+      setTime(0);
+    });
+
+    return () => {
+      socket.off("update-interviewer");
+      socket.off("new-question");
+      socket.off("meeting-status");
+      socket.off("meeting-ended");
+    };
+  }, []);
+
+  const toggleMic = () => {
+    const newMicState = !micOn;
+    setMicOn(newMicState);
+    toggleAudio(newMicState);
+    socket.emit("participant-toggle", { micOn: newMicState, camOn });
+  };
+
+  const toggleCam = () => {
+    const newCamState = !camOn;
+    setCamOn(newCamState);
+    toggleVideo(newCamState);
+    socket.emit("participant-toggle", { micOn, camOn: newCamState });
+  };
+
+  const sendAnswer = () => {
+    if(!answer.trim()) return;
+    socket.emit("new-answer", answer);
     setAnswer("");
   };
 
-  const handleEndInterview = () => {
-    if (participantStreamRef.current)
-      participantStreamRef.current.getTracks().forEach((t) => t.stop());
-    clearInterval(timerRef.current);
-    alert("Interview Ended");
-  };
+  const formatTime = s => `${Math.floor(s/60).toString().padStart(2,'0')}:${(s%60).toString().padStart(2,'0')}`;
 
   return (
-    <div className="join-container">
-      {/* Participant Column */}
-      <div className="video-column">
-        <h3>Participant</h3>
-
-        <div className="video-box">
-          {participantCam ? (
-            <video ref={participantVideoRef} autoPlay muted />
-          ) : (
-            <div>Camera Off</div>
-          )}
+    <div style={{ padding: '20px', fontFamily: 'Arial, sans-serif' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+        <h2>🧑‍🎓 Participant Dashboard</h2>
+        <div style={{ fontSize: '18px', fontWeight: 'bold' }}>
+          ⏱ {formatTime(time)}
         </div>
+      </div>
 
-        <div className="controls">
-          <button
-            className={`control-btn ${participantMic ? "on" : "off"}`}
-            onClick={() => setParticipantMic(!participantMic)}
-          >
-            {participantMic ? <FaMicrophone /> : <FaMicrophoneSlash />}
-          </button>
-          <button
-            className={`control-btn ${participantCam ? "on" : "off"}`}
-            onClick={() => setParticipantCam(!participantCam)}
-          >
-            {participantCam ? <FaVideo /> : <FaVideoSlash />}
-          </button>
+      {error && (
+        <div style={{ color: 'red', padding: '15px', border: '2px solid red', borderRadius: '5px', marginBottom: '20px', backgroundColor: '#ffe6e6' }}>
+          ⚠️ {error}
         </div>
+      )}
 
-        <div className="answer-section">
-          <textarea
-            value={answer}
-            onChange={(e) => setAnswer(e.target.value)}
-            placeholder="Type your answer here..."
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '20px' }}>
+        {/* Local Video (Participant) */}
+        <div style={{ border: '2px solid #ddd', borderRadius: '10px', padding: '10px', backgroundColor: '#f9f9f9' }}>
+          <div style={{ fontWeight: 'bold', marginBottom: '10px', display: 'flex', justifyContent: 'space-between' }}>
+            <span>Your Camera</span>
+            {isConnected && <span style={{ color: 'green' }}>● Connected</span>}
+          </div>
+          <video 
+            ref={localVideoRef} 
+            autoPlay 
+            muted 
+            playsInline
+            style={{ width: '100%', borderRadius: '8px', backgroundColor: '#000' }}
           />
-          <div className="interview-footer">
-            <button onClick={handleSendAnswer} className="control-btn on">
-              Send
+          <div style={{ display: 'flex', gap: '10px', marginTop: '10px', justifyContent: 'center' }}>
+            <button 
+              style={{ 
+                padding: '10px 15px', 
+                backgroundColor: micOn ? '#007bff' : '#dc3545', 
+                color: 'white', 
+                border: 'none', 
+                borderRadius: '5px', 
+                cursor: 'pointer',
+                fontSize: '16px'
+              }}
+              onClick={toggleMic}
+              title={micOn ? 'Mute' : 'Unmute'}
+            >
+              {micOn ? <FaMicrophone /> : <FaMicrophoneSlash />}
             </button>
-            <button onClick={handleEndInterview} className="end-btn">
-              End Interview
+            <button 
+              style={{ 
+                padding: '10px 15px', 
+                backgroundColor: camOn ? '#007bff' : '#dc3545', 
+                color: 'white', 
+                border: 'none', 
+                borderRadius: '5px', 
+                cursor: 'pointer',
+                fontSize: '16px'
+              }}
+              onClick={toggleCam}
+              title={camOn ? 'Turn off camera' : 'Turn on camera'}
+            >
+              {camOn ? <FaVideo /> : <FaVideoSlash />}
             </button>
-            <span className="timer">{timer}s</span>
+          </div>
+        </div>
+
+        {/* Remote Video (Interviewer) */}
+        <div style={{ border: '2px solid #ddd', borderRadius: '10px', padding: '10px', backgroundColor: '#f9f9f9' }}>
+          <div style={{ fontWeight: 'bold', marginBottom: '10px' }}>
+            Interviewer's Camera
+          </div>
+          <video 
+            ref={remoteVideoRef} 
+            autoPlay 
+            playsInline
+            style={{ width: '100%', borderRadius: '8px', backgroundColor: '#000' }}
+          />
+          <div style={{ marginTop: '10px', display: 'flex', gap: '20px', justifyContent: 'center' }}>
+            <span>Cam: {interviewerState.camOn ? '✅ On' : '❌ Off'}</span>
+            <span>Mic: {interviewerState.micOn ? '✅ On' : '❌ Off'}</span>
           </div>
         </div>
       </div>
 
-      {/* Interviewer Column */}
-      <div className="video-column">
-        <h3>Interviewer</h3>
-        <div className="video-box">
-          <video ref={interviewerVideoRef} autoPlay muted />
+      {/* Questions Section */}
+      <div style={{ border: '2px solid #ddd', borderRadius: '10px', padding: '15px', backgroundColor: '#f9f9f9', marginBottom: '20px' }}>
+        <h3>📋 Questions from Interviewer</h3>
+        {questions.length === 0 ? (
+          <p style={{ color: '#666' }}>No questions yet...</p>
+        ) : (
+          <div style={{ maxHeight: '150px', overflowY: 'auto' }}>
+            {questions.map((q, i) => (
+              <div key={i} style={{ padding: '10px', marginBottom: '10px', backgroundColor: 'white', borderRadius: '5px', border: '1px solid #ddd' }}>
+                <strong>Q{i + 1}:</strong> {q}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Answer Panel */}
+      <div style={{ border: '2px solid #ddd', borderRadius: '10px', padding: '15px', backgroundColor: '#f9f9f9' }}>
+        <h3>✍️ Send Answer to Interviewer</h3>
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+          <textarea 
+            value={answer} 
+            onChange={e => setAnswer(e.target.value)} 
+            placeholder="Type your answer here..."
+            rows="3"
+            style={{ flex: 1, padding: '10px', fontSize: '14px', borderRadius: '5px', border: '1px solid #ccc' }}
+          />
+          <button 
+            style={{ 
+              padding: '10px 20px', 
+              backgroundColor: answer.trim() ? '#007bff' : '#ccc', 
+              color: 'white', 
+              border: 'none', 
+              borderRadius: '5px', 
+              cursor: answer.trim() ? 'pointer' : 'not-allowed',
+              height: '80px'
+            }}
+            onClick={sendAnswer}
+            disabled={!answer.trim()}
+          >
+            Send Answer
+          </button>
         </div>
       </div>
     </div>
   );
 }
-
-export default JoinParticipant;
