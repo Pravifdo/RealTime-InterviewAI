@@ -1,20 +1,29 @@
 import React from 'react';
 import './App.css';
-import Login from './components/login/loging';
 import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
-import ParticipantDashboard from './components/participant/participantDashbord';
-import InterviewerDashboard from './components/interviewer/InterviewerDashboard';
-import JoinParticipant from './components/participant/join-participant/join-partcipant';
+
+// Import pages using the index file for cleaner imports
+import {
+  Home,
+  Login,
+  Register,
+  ParticipantDashboard,
+  InterviewerDashboard,
+  JoinInterview
+} from './pages';
+import JoinParticipant from './pages/joinParticipant';
 
 function App() {
   return (
     <Router>
       <Routes>
-        <Route path="/" element={<Login />} />
-        <Route path="/login" element={<Login />} /> {/* login route */}
+        <Route path="/" element={<Home />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/register" element={<Register />} />
         <Route path="/participant" element={<ParticipantDashboard />} />
         <Route path="/interviewer" element={<InterviewerDashboard />} />
-        <Route path="/join-participant" element={<JoinParticipant />} />
+        <Route path="/joinParticipant" element={<JoinParticipant />} />
+        <Route path="/JoinInterview" element={<JoinInterview />} />
       </Routes>
     </Router>
   );

@@ -1,0 +1,125 @@
+.login-page {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.login-container {
+  margin: 40px auto;
+}
+
+.login-paper {
+  padding: 40px;
+  border-radius: 15px;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+}
+
+.login-box {
+  display: flex;
+  flex-direction: column;
+}
+
+.login-title {
+  color: #333;
+  font-weight: bold;
+  margin-bottom: 8px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.login-subtitle {
+  color: #666;
+  margin-bottom: 20px;
+}
+
+.login-error {
+  margin-bottom: 16px;
+  border-radius: 8px;
+}
+
+.role-toggle {
+  margin: 20px 0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  border-radius: 8px;
+}
+
+.role-toggle .MuiToggleButton-root {
+  padding: 12px;
+  font-weight: 600;
+  text-transform: none;
+}
+
+.role-toggle .MuiToggleButton-root.Mui-selected {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+}
+
+.role-toggle .MuiToggleButton-root.Mui-selected:hover {
+  background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
+}
+
+.login-btn {
+  margin-top: 24px;
+  padding: 12px;
+  font-size: 1.1rem;
+  font-weight: 600;
+  text-transform: none;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 8px;
+  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+  transition: all 0.3s ease;
+}
+
+.login-btn:hover {
+  background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
+  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+  transform: translateY(-2px);
+}
+
+.login-btn:disabled {
+  background: #ccc;
+  box-shadow: none;
+  transform: none;
+}
+
+.register-link-box {
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid #e0e0e0;
+}
+
+.register-link {
+  color: #667eea;
+  font-weight: 600;
+  text-transform: none;
+  padding: 0;
+  min-width: auto;
+}
+
+.register-link:hover {
+  background: transparent;
+  color: #764ba2;
+  text-decoration: underline;
+}
+
+.demo-text {
+  margin-top: 20px;
+  color: #888;
+  font-style: italic;
+}
+
+@media (max-width: 600px) {
+  .login-paper {
+    padding: 30px 20px;
+  }
+
+  .login-title {
+    font-size: 1.8rem;
+  }
+}

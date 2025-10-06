@@ -1,10 +1,119 @@
-# Getting Started with Create React App
+# InterviewAI Frontend
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+## 🎯 Overview
 
-## Available Scripts
+InterviewAI is a real-time AI-powered interview platform that helps participants practice interviews and allows interviewers to conduct and evaluate sessions efficiently.
 
-In the project directory, you can run:
+### ✨ What's New in This Version
+
+- ✅ New Home page with Login and Register buttons
+- ✅ Register page for new user registration
+- ✅ Improved Login page with better UI
+- ✅ Standard React project architecture
+- ✅ Reusable components (Button, Card, Sidebar)
+- ✅ Centralized API service
+- ✅ All routes properly integrated
+
+## 🚀 Quick Start
+
+### Installation
+
+```bash
+cd frontend
+npm install
+```
+
+### Run Development Server
+
+```bash
+npm start
+```
+
+The application will open at [http://localhost:3000](http://localhost:3000)
+
+### Build for Production
+
+```bash
+npm run build
+```
+
+## 🗺️ Application Flow
+
+### For New Users:
+1. Open `http://localhost:3000` (Home page)
+2. Click **"Register"** button
+3. Fill in registration form and select role
+4. Register and login with credentials
+5. Redirected to role-based dashboard
+
+### For Existing Users:
+1. Click **"Login"** on Home page
+2. Select role and enter credentials
+3. Redirected to dashboard based on role
+
+## 📍 Available Routes
+
+| Route | Component | Description |
+|-------|-----------|-------------|
+| `/` | Home | Landing page with Login/Register buttons |
+| `/login` | Login | User authentication |
+| `/register` | Register | New user registration |
+| `/participant` | ParticipantDashboard | Participant's dashboard (protected) |
+| `/interviewer` | InterviewerDashboard | Interviewer's dashboard (protected) |
+| `/join-participant` | JoinInterview | Live interview session (protected) |
+
+## 🎨 Features
+
+- **Home Page**: Professional landing page with navigation
+- **Authentication**: Login and Register with role selection
+- **Dashboards**: Separate dashboards for participants and interviewers
+- **Live Sessions**: Real-time video interview sessions
+- **Responsive Design**: Works on all screen sizes
+
+## 📁 Project Structure
+
+```
+frontend/
+├── src/
+│   ├── pages/              # Route components
+│   ├── components/common/  # Reusable components
+│   ├── services/           # API services
+│   └── styles/             # CSS files
+```
+
+## 🔐 Authentication
+
+- Token-based authentication
+- Protected routes
+- Role-based access control
+- Automatic token management
+
+## ⚙️ Backend Integration
+
+Make sure the backend is running at `http://localhost:5000`
+
+```bash
+cd backend/node
+npm install
+npm start
+```
+
+## 📚 Documentation
+
+- **Architecture**: See `ARCHITECTURE.md` for detailed architecture
+- **Changes**: See `REFACTORING_SUMMARY.md` for refactoring details
+
+## 📦 Technologies
+
+- React 19
+- React Router DOM
+- Material-UI
+- Axios
+- CSS3
+
+---
+
+## Available Scripts (Create React App)
 
 ### `npm start`
 
