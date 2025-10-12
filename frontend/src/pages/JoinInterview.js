@@ -282,12 +282,30 @@ export default function JoinInterview() {
                 flexDirection: 'column',
                 alignItems: 'center',
                 justifyContent: 'center',
-                color: '#fff'
+                color: '#fff',
+                zIndex: 2
               }}>
                 <FaVideoSlash style={{ fontSize: '48px', marginBottom: '10px', color: '#666' }} />
                 <p style={{ margin: 0, color: '#999' }}>
                   {!remoteStream ? 'Waiting for participant...' : 'Participant\'s Camera Off'}
                 </p>
+              </div>
+            )}
+            {/* Show mic muted indicator when mic is off but camera is on */}
+            {remoteStream && participantState.camOn && !participantState.micOn && (
+              <div style={{
+                position: 'absolute',
+                bottom: '10px',
+                left: '10px',
+                backgroundColor: 'rgba(220, 53, 69, 0.9)',
+                borderRadius: '50%',
+                padding: '12px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                zIndex: 3
+              }}>
+                <FaMicrophoneSlash style={{ fontSize: '24px', color: 'white' }} />
               </div>
             )}
           </div>
