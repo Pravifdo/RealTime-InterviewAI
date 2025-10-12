@@ -264,10 +264,12 @@ export default function JoinInterview() {
                 borderRadius: '8px', 
                 backgroundColor: '#000', 
                 minHeight: '300px',
-                objectFit: 'cover'
+                objectFit: 'cover',
+                display: remoteStream ? 'block' : 'none'
               }}
             />
-            {!remoteStream && (
+            {/* Show overlay when camera is off OR no stream */}
+            {(!remoteStream || !participantState.camOn) && (
               <div style={{
                 position: 'absolute',
                 top: 0,
@@ -283,7 +285,9 @@ export default function JoinInterview() {
                 color: '#fff'
               }}>
                 <FaVideoSlash style={{ fontSize: '48px', marginBottom: '10px', color: '#666' }} />
-                <p style={{ margin: 0, color: '#999' }}>Waiting for participant...</p>
+                <p style={{ margin: 0, color: '#999' }}>
+                  {!remoteStream ? 'Waiting for participant...' : 'Participant\'s Camera Off'}
+                </p>
               </div>
             )}
           </div>
