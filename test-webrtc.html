@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebRTC Connection Tester</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            border-bottom: 3px solid #007bff;
+            padding-bottom: 10px;
+        }
+        .status {
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+        .success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .warning {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeeba;
+        }
+        .info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 5px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            background: #f9f9f9;
+            border-left: 4px solid #007bff;
+        }
+        .log {
+            background: #000;
+            color: #0f0;
+            padding: 15px;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+            max-height: 300px;
+            overflow-y: auto;
+            margin: 10px 0;
+        }
+        .checklist {
+            list-style: none;
+            padding: 0;
+        }
+        .checklist li {
+            padding: 8px;
+            margin: 5px 0;
+            background: #fff;
+            border-left: 4px solid #28a745;
+        }
+        .checklist li.fail {
+            border-left-color: #dc3545;
+        }
+        .checklist li.pending {
+            border-left-color: #ffc107;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 WebRTC Connection Diagnostic Tool</h1>
+        <p>Use this tool to test if WebRTC is working correctly in your browser.</p>
+
+        <div class="test-section">
+            <h2>Step 1: Camera & Microphone Test</h2>
+            <button id="testMedia">Test Camera/Mic Access</button>
+            <div id="mediaStatus"></div>
+            <div id="mediaLog" class="log" style="display:none;"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>Step 2: Socket.IO Connection Test</h2>
+            <button id="testSocket">Test Socket Connection</button>
+            <div id="socketStatus"></div>
+            <div id="socketLog" class="log" style="display:none;"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>Step 3: WebRTC Peer Connection Test</h2>
+            <button id="testWebRTC" disabled>Test WebRTC Connection</button>
+            <div id="webrtcStatus"></div>
+            <div id="webrtcLog" class="log" style="display:none;"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>Step 4: Full System Check</h2>
+            <button id="fullTest">Run Complete Test</button>
+            <div id="fullTestStatus"></div>
+            <ul id="checklist" class="checklist"></ul>
+        </div>
+
+        <div class="test-section">
+            <h2>📋 Current Issues Detected:</h2>
+            <div id="issues"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>💡 Recommended Actions:</h2>
+            <div id="recommendations"></div>
+        </div>
+    </div>
+
+    <script src="https://cdn.socket.io/4.8.1/socket.io.min.js"></script>
+    <script>
+        const log = (elementId, message, type = 'info') => {
+            const logEl = document.getElementById(elementId);
+            if (logEl) {
+                logEl.style.display = 'block';
+                const timestamp = new Date().toLocaleTimeString();
+                logEl.innerHTML += `[${timestamp}] ${message}<br>`;
+                logEl.scrollTop = logEl.scrollHeight;
+            }
+        };
+
+        const setStatus = (elementId, message, type = 'info') => {
+            const statusEl = document.getElementById(elementId);
+            if (statusEl) {
+                statusEl.className = `status ${type}`;
+                statusEl.innerHTML = message;
+            }
+        };
+
+        // Test 1: Media Access
+        document.getElementById('testMedia').addEventListener('click', async () => {
+            try {
+                log('mediaLog', 'Requesting camera and microphone access...');
+                setStatus('mediaStatus', '⏳ Testing media devices...', 'warning');
+
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: true,
+                    audio: true
+                });
+
+                log('mediaLog', `✅ Got media stream: ${stream.id}`);
+                log('mediaLog', `Video tracks: ${stream.getVideoTracks().length}`);
+                log('mediaLog', `Audio tracks: ${stream.getAudioTracks().length}`);
+
+                stream.getTracks().forEach(track => {
+                    log('mediaLog', `Track: ${track.kind} - ${track.label} - Enabled: ${track.enabled}`);
+                });
+
+                setStatus('mediaStatus', '✅ Camera and microphone access granted!', 'success');
+                document.getElementById('testWebRTC').disabled = false;
+
+                // Clean up
+                stream.getTracks().forEach(track => track.stop());
+                log('mediaLog', 'Media stream stopped');
+
+            } catch (err) {
+                log('mediaLog', `❌ Error: ${err.name} - ${err.message}`);
+                setStatus('mediaStatus', `❌ Failed: ${err.message}`, 'error');
+            }
+        });
+
+        // Test 2: Socket.IO
+        document.getElementById('testSocket').addEventListener('click', () => {
+            try {
+                log('socketLog', 'Connecting to Socket.IO server at http://localhost:5000...');
+                setStatus('socketStatus', '⏳ Testing Socket.IO connection...', 'warning');
+
+                const socket = io('http://localhost:5000');
+
+                socket.on('connect', () => {
+                    log('socketLog', `✅ Connected! Socket ID: ${socket.id}`);
+                    setStatus('socketStatus', '✅ Socket.IO connection successful!', 'success');
+
+                    // Test room join
+                    socket.emit('join-room', 'test-room');
+                    log('socketLog', 'Joined test-room');
+                });
+
+                socket.on('connect_error', (err) => {
+                    log('socketLog', `❌ Connection error: ${err.message}`);
+                    setStatus('socketStatus', '❌ Socket.IO connection failed! Is backend running?', 'error');
+                });
+
+                socket.on('user-joined', (userId) => {
+                    log('socketLog', `👤 User joined: ${userId}`);
+                });
+
+                // Disconnect after 5 seconds
+                setTimeout(() => {
+                    socket.disconnect();
+                    log('socketLog', 'Disconnected from server');
+                }, 5000);
+
+            } catch (err) {
+                log('socketLog', `❌ Error: ${err.message}`);
+                setStatus('socketStatus', `❌ Failed: ${err.message}`, 'error');
+            }
+        });
+
+        // Test 3: WebRTC
+        document.getElementById('testWebRTC').addEventListener('click', async () => {
+            try {
+                log('webrtcLog', 'Creating RTCPeerConnection...');
+                setStatus('webrtcStatus', '⏳ Testing WebRTC...', 'warning');
+
+                const config = {
+                    iceServers: [
+                        { urls: 'stun:stun.l.google.com:19302' },
+                        { urls: 'stun:stun1.l.google.com:19302' }
+                    ]
+                };
+
+                const pc = new RTCPeerConnection(config);
+                log('webrtcLog', '✅ Peer connection created');
+
+                // Get local stream
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+                log('webrtcLog', `✅ Got local stream: ${stream.id}`);
+
+                // Add tracks
+                stream.getTracks().forEach(track => {
+                    pc.addTrack(track, stream);
+                    log('webrtcLog', `Added track: ${track.kind}`);
+                });
+
+                // Monitor connection state
+                pc.oniceconnectionstatechange = () => {
+                    log('webrtcLog', `ICE connection state: ${pc.iceConnectionState}`);
+                };
+
+                pc.onconnectionstatechange = () => {
+                    log('webrtcLog', `Connection state: ${pc.connectionState}`);
+                };
+
+                pc.onicecandidate = (event) => {
+                    if (event.candidate) {
+                        log('webrtcLog', `ICE candidate: ${event.candidate.type}`);
+                    }
+                };
+
+                // Create offer
+                const offer = await pc.createOffer();
+                await pc.setLocalDescription(offer);
+                log('webrtcLog', '✅ Created and set local description (offer)');
+
+                setStatus('webrtcStatus', '✅ WebRTC peer connection working!', 'success');
+
+                // Clean up
+                setTimeout(() => {
+                    stream.getTracks().forEach(track => track.stop());
+                    pc.close();
+                    log('webrtcLog', 'Cleaned up resources');
+                }, 3000);
+
+            } catch (err) {
+                log('webrtcLog', `❌ Error: ${err.message}`);
+                setStatus('webrtcStatus', `❌ Failed: ${err.message}`, 'error');
+            }
+        });
+
+        // Full Test
+        document.getElementById('fullTest').addEventListener('click', async () => {
+            const checklist = document.getElementById('checklist');
+            const issues = document.getElementById('issues');
+            const recommendations = document.getElementById('recommendations');
+
+            checklist.innerHTML = '';
+            issues.innerHTML = '';
+            recommendations.innerHTML = '';
+
+            const checks = [
+                { name: 'Browser supports getUserMedia', test: () => !!navigator.mediaDevices?.getUserMedia },
+                { name: 'Browser supports RTCPeerConnection', test: () => !!window.RTCPeerConnection },
+                { name: 'Browser supports Socket.IO', test: () => !!window.io },
+                { name: 'Running on localhost', test: () => window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' },
+                { name: 'HTTPS or localhost (required for camera)', test: () => window.location.protocol === 'https:' || window.location.hostname === 'localhost' },
+            ];
+
+            const results = [];
+
+            for (const check of checks) {
+                const li = document.createElement('li');
+                try {
+                    const result = check.test();
+                    if (result) {
+                        li.textContent = `✅ ${check.name}`;
+                        li.className = '';
+                        results.push({ name: check.name, passed: true });
+                    } else {
+                        li.textContent = `❌ ${check.name}`;
+                        li.className = 'fail';
+                        results.push({ name: check.name, passed: false });
+                    }
+                } catch (err) {
+                    li.textContent = `❌ ${check.name} - ${err.message}`;
+                    li.className = 'fail';
+                    results.push({ name: check.name, passed: false, error: err.message });
+                }
+                checklist.appendChild(li);
+            }
+
+            // Analyze results
+            const failed = results.filter(r => !r.passed);
+
+            if (failed.length === 0) {
+                setStatus('fullTestStatus', '✅ All checks passed! Your browser is ready for WebRTC.', 'success');
+                issues.innerHTML = '<div class="status success">No issues detected!</div>';
+                recommendations.innerHTML = '<div class="status info">Your setup looks good. Make sure both backend and frontend servers are running.</div>';
+            } else {
+                setStatus('fullTestStatus', `⚠️ ${failed.length} issue(s) detected`, 'error');
+                
+                let issueHTML = '<ul>';
+                let recHTML = '<ul>';
+
+                failed.forEach(fail => {
+                    issueHTML += `<li>❌ ${fail.name}</li>`;
+
+                    if (fail.name.includes('getUserMedia')) {
+                        recHTML += '<li>Update your browser to a modern version (Chrome, Firefox, Edge)</li>';
+                    } else if (fail.name.includes('RTCPeerConnection')) {
+                        recHTML += '<li>Your browser doesn\'t support WebRTC. Use Chrome, Firefox, or Edge.</li>';
+                    } else if (fail.name.includes('localhost')) {
+                        recHTML += '<li>Access the app via http://localhost:3000, not 127.0.0.1 or IP address</li>';
+                    } else if (fail.name.includes('HTTPS')) {
+                        recHTML += '<li>Camera access requires HTTPS or localhost. You\'re good if testing locally.</li>';
+                    }
+                });
+
+                issueHTML += '</ul>';
+                recHTML += '</ul>';
+
+                issues.innerHTML = issueHTML;
+                recommendations.innerHTML = recHTML;
+            }
+        });
+
+        // Run full test on load
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                document.getElementById('fullTest').click();
+            }, 500);
+        });
+    </script>
+</body>
+</html>

@@ -42,18 +42,58 @@ export default function JoinInterview() {
   // Update local video element
   useEffect(() => {
     if (localVideoRef.current && localStream) {
+      console.log('Setting local video stream');
       localVideoRef.current.srcObject = localStream;
     }
   }, [localStream]);
 
   // Update remote video element
   useEffect(() => {
-    if (remoteVideoRef.current && remoteStream) {
-      remoteVideoRef.current.srcObject = remoteStream;
+    console.log('🔄 Remote stream updated:', remoteStream);
+    if (remoteVideoRef.current) {
+      if (remoteStream) {
+        console.log('✅ Setting remote video stream to element');
+        const tracks = remoteStream.getTracks();
+        console.log('Remote stream tracks:', tracks.map(t => ({
+          kind: t.kind,
+          enabled: t.enabled,
+          readyState: t.readyState,
+          muted: t.muted
+        })));
+        
+        // Set the stream
+        remoteVideoRef.current.srcObject = remoteStream;
+        
+        // Add event listeners for debugging
+        const videoElement = remoteVideoRef.current;
+        
+        videoElement.onloadedmetadata = () => {
+          console.log('✅ Remote video metadata loaded');
+          console.log('Video dimensions:', videoElement.videoWidth, 'x', videoElement.videoHeight);
+        };
+        
+        videoElement.onplay = () => {
+          console.log('▶️ Remote video started playing');
+        };
+        
+        videoElement.onerror = (e) => {
+          console.error('❌ Remote video error:', e);
+        };
+        
+        // Log video element state
+        console.log('Video element readyState:', videoElement.readyState);
+        console.log('Video element paused:', videoElement.paused);
+        
+        // Force play in case autoplay is blocked
+        videoElement.play().catch(err => {
+          console.error('❌ Error playing remote video:', err);
+        });
+      } else {
+        console.log('⚠️ Remote stream is null, clearing video element');
+        remoteVideoRef.current.srcObject = null;
+      }
     }
-  }, [remoteStream]);
-
-  // Socket events
+  }, [remoteStream]);  // Socket events
   useEffect(() => {
     socket.on("update-participant", setParticipantState);
     socket.on("meeting-status", data => setTime(data.time));
@@ -141,13 +181,39 @@ export default function JoinInterview() {
             <span>Your Camera</span>
             {isConnected && <span style={{ color: 'green' }}>● Connected</span>}
           </div>
-          <video 
-            ref={localVideoRef} 
-            autoPlay 
-            muted 
-            playsInline
-            style={{ width: '100%', borderRadius: '8px', backgroundColor: '#000' }}
-          />
+          <div style={{ position: 'relative', width: '100%', minHeight: '300px' }}>
+            <video 
+              ref={localVideoRef} 
+              autoPlay 
+              muted 
+              playsInline
+              style={{ 
+                width: '100%', 
+                borderRadius: '8px', 
+                backgroundColor: '#000',
+                display: camOn ? 'block' : 'none'
+              }}
+            />
+            {!camOn && (
+              <div style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                width: '100%',
+                height: '300px',
+                backgroundColor: '#1a1a1a',
+                borderRadius: '8px',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#fff'
+              }}>
+                <FaVideoSlash style={{ fontSize: '48px', marginBottom: '10px', color: '#666' }} />
+                <p style={{ margin: 0, color: '#999' }}>Camera Off</p>
+              </div>
+            )}
+          </div>
           <div style={{ display: 'flex', gap: '10px', marginTop: '10px', justifyContent: 'center' }}>
             <button 
               style={{ 
@@ -185,17 +251,50 @@ export default function JoinInterview() {
         {/* Remote Video (Participant) */}
         <div style={{ border: '2px solid #ddd', borderRadius: '10px', padding: '10px', backgroundColor: '#f9f9f9' }}>
           <div style={{ fontWeight: 'bold', marginBottom: '10px' }}>
-            Participant's Camera
+            Participant's Camera {remoteStream && <span style={{ fontSize: '12px', color: 'green' }}>● Stream Active</span>}
           </div>
-          <video 
-            ref={remoteVideoRef} 
-            autoPlay 
-            playsInline
-            style={{ width: '100%', borderRadius: '8px', backgroundColor: '#000' }}
-          />
+          <div style={{ position: 'relative', width: '100%', minHeight: '300px' }}>
+            <video 
+              ref={remoteVideoRef} 
+              autoPlay 
+              playsInline
+              controls={false}
+              style={{ 
+                width: '100%', 
+                borderRadius: '8px', 
+                backgroundColor: '#000', 
+                minHeight: '300px',
+                objectFit: 'cover'
+              }}
+            />
+            {!remoteStream && (
+              <div style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                width: '100%',
+                height: '100%',
+                backgroundColor: '#1a1a1a',
+                borderRadius: '8px',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#fff'
+              }}>
+                <FaVideoSlash style={{ fontSize: '48px', marginBottom: '10px', color: '#666' }} />
+                <p style={{ margin: 0, color: '#999' }}>Waiting for participant...</p>
+              </div>
+            )}
+          </div>
           <div style={{ marginTop: '10px', display: 'flex', gap: '20px', justifyContent: 'center' }}>
             <span>Cam: {participantState.camOn ? '✅ On' : '❌ Off'}</span>
             <span>Mic: {participantState.micOn ? '✅ On' : '❌ Off'}</span>
+            {remoteStream && (
+              <span style={{ fontSize: '11px', color: '#666' }}>
+                Tracks: {remoteStream.getTracks().filter(t => t.kind === 'video').length}V/{remoteStream.getTracks().filter(t => t.kind === 'audio').length}A
+              </span>
+            )}
           </div>
         </div>
       </div>
