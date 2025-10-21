@@ -1,10 +1,9 @@
 import React, { useState, useEffect, useRef } from "react";
-import { FaMicrophone, FaMicrophoneSlash, FaVideo, FaVideoSlash, FaPaperPlane, FaClock, FaUserGraduate, FaUserTie, FaQuestionCircle, FaComment } from "react-icons/fa";
+import { FaMicrophone, FaMicrophoneSlash, FaVideo, FaVideoSlash, FaPaperPlane, FaClock, FaUserGraduate, FaUserTie, FaQuestionCircle, FaComment, FaSignInAlt } from "react-icons/fa";
 import { io } from "socket.io-client";
 import { useWebRTC } from "../hooks/useWebRTC";
 
 const socket = io("http://localhost:5000");
-const ROOM_ID = "interview-room";
 
 export default function JoinParticipant() {
   const [micOn, setMicOn] = useState(true);
@@ -13,11 +12,28 @@ export default function JoinParticipant() {
   const [answer, setAnswer] = useState("");
   const [questions, setQuestions] = useState([]);
   const [interviewerState, setInterviewerState] = useState({ camOn: true, micOn: true });
+  const [roomID, setRoomID] = useState('');
+  const [roomIDInput, setRoomIDInput] = useState('');
+  const [isJoined, setIsJoined] = useState(false);
 
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
 
-  // Initialize WebRTC (participant is NOT the initiator)
+  // Check for Room ID in URL on mount
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const roomFromURL = urlParams.get('room');
+    
+    if (roomFromURL) {
+      console.log('🔗 Room ID detected in URL:', roomFromURL);
+      setRoomIDInput(roomFromURL);
+      setRoomID(roomFromURL);
+      setIsJoined(true);
+      console.log('✅ Auto-joining room:', roomFromURL);
+    }
+  }, []);
+
+  // Initialize WebRTC only after joining room
   const {
     localStream,
     remoteStream,
@@ -27,14 +43,17 @@ export default function JoinParticipant() {
     toggleVideo,
     toggleAudio,
     cleanup,
-  } = useWebRTC(socket, ROOM_ID, false);
+  } = useWebRTC(socket, roomID, false);
 
-  // Initialize local stream on mount
+  // Initialize local stream on mount only after joining
   useEffect(() => {
-    initLocalStream(camOn, micOn);
+    if (isJoined && roomID) {
+      initLocalStream(camOn, micOn);
+      console.log('🔗 Joined Room:', roomID);
+    }
     return () => cleanup();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [isJoined, roomID]);
 
   // Update local video element
   useEffect(() => {
@@ -90,10 +109,145 @@ export default function JoinParticipant() {
     setAnswer("");
   };
 
+  const handleJoinRoom = () => {
+    if (!roomIDInput.trim()) {
+      alert('Please enter a Room ID');
+      return;
+    }
+    setRoomID(roomIDInput.trim());
+    setIsJoined(true);
+    console.log('🔗 Attempting to join room:', roomIDInput.trim());
+  };
+
   const formatTime = s => `${Math.floor(s/60).toString().padStart(2,'0')}:${(s%60).toString().padStart(2,'0')}`;
+
+  // Show Room ID entry screen if not joined
+  if (!isJoined) {
+    return (
+      <div style={{
+        minHeight: '100vh',
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        fontFamily: 'Arial, sans-serif'
+      }}>
+        <div style={{
+          backgroundColor: 'white',
+          borderRadius: '15px',
+          padding: '40px',
+          boxShadow: '0 10px 40px rgba(0,0,0,0.2)',
+          maxWidth: '500px',
+          width: '90%'
+        }}>
+          <div style={{ textAlign: 'center', marginBottom: '30px' }}>
+            <FaUserGraduate style={{ fontSize: '60px', color: '#667eea', marginBottom: '15px' }} />
+            <h1 style={{ margin: '0 0 10px 0', color: '#333' }}>Join Interview</h1>
+            <p style={{ color: '#666', margin: 0 }}>Enter the Room ID provided by the interviewer</p>
+          </div>
+
+          <div style={{ marginBottom: '20px' }}>
+            <label style={{ 
+              display: 'block', 
+              marginBottom: '10px', 
+              fontWeight: 'bold',
+              color: '#333'
+            }}>
+              Room ID
+            </label>
+            <input
+              type="text"
+              value={roomIDInput}
+              onChange={(e) => setRoomIDInput(e.target.value)}
+              onKeyPress={(e) => e.key === 'Enter' && handleJoinRoom()}
+              placeholder="Enter room ID (e.g., room-abc123)"
+              style={{
+                width: '100%',
+                padding: '15px',
+                fontSize: '16px',
+                border: '2px solid #ddd',
+                borderRadius: '8px',
+                boxSizing: 'border-box',
+                fontFamily: 'monospace',
+                letterSpacing: '1px'
+              }}
+              autoFocus
+            />
+          </div>
+
+          <button
+            onClick={handleJoinRoom}
+            style={{
+              width: '100%',
+              padding: '15px',
+              fontSize: '18px',
+              fontWeight: 'bold',
+              color: 'white',
+              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              border: 'none',
+              borderRadius: '8px',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '10px',
+              transition: 'transform 0.2s'
+            }}
+            onMouseOver={(e) => e.currentTarget.style.transform = 'scale(1.02)'}
+            onMouseOut={(e) => e.currentTarget.style.transform = 'scale(1)'}
+          >
+            <FaSignInAlt />
+            Join Interview Room
+          </button>
+
+          <div style={{
+            marginTop: '25px',
+            padding: '15px',
+            backgroundColor: '#f0f4ff',
+            borderRadius: '8px',
+            borderLeft: '4px solid #667eea'
+          }}>
+            <p style={{ margin: '0 0 8px 0', fontWeight: 'bold', color: '#333', fontSize: '14px' }}>
+              ℹ️ Instructions:
+            </p>
+            <ul style={{ margin: 0, paddingLeft: '20px', color: '#666', fontSize: '13px' }}>
+              <li>Get the Room ID from your interviewer</li>
+              <li>Enter it exactly as provided</li>
+              <li>You'll be connected to the interview session</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="participant-dashboard">
+      {/* Room ID Display Banner */}
+      {roomID && (
+        <div style={{
+          backgroundColor: '#2196F3',
+          color: 'white',
+          padding: '12px 20px',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          gap: '10px',
+          fontSize: '14px',
+          boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+        }}>
+          <span>🔗 Connected to Room:</span>
+          <code style={{
+            backgroundColor: 'rgba(255,255,255,0.2)',
+            padding: '4px 12px',
+            borderRadius: '4px',
+            fontSize: '15px',
+            letterSpacing: '1px',
+            fontWeight: 'bold'
+          }}>{roomID}</code>
+        </div>
+      )}
+      
       {/* Header Section */}
       <div className="dashboard-header">
         <div className="header-left">

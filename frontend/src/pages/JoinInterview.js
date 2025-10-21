@@ -1,10 +1,14 @@
 import React, { useState, useEffect, useRef } from "react";
-import { FaMicrophone, FaMicrophoneSlash, FaVideo, FaVideoSlash, FaPaperPlane, FaClock, FaUserTie, FaUserGraduate, FaPlay, FaStop, FaQuestionCircle } from "react-icons/fa";
+import { FaMicrophone, FaMicrophoneSlash, FaVideo, FaVideoSlash, FaPaperPlane, FaClock, FaUserTie, FaUserGraduate, FaPlay, FaStop, FaQuestionCircle, FaCopy } from "react-icons/fa";
 import { io } from "socket.io-client";
 import { useWebRTC } from "../hooks/useWebRTC";
 
 const socket = io("http://localhost:5000");
-const ROOM_ID = "interview-room";
+
+// Generate unique Room ID
+const generateRoomID = () => {
+  return 'room-' + Math.random().toString(36).substr(2, 9);
+};
 
 export default function JoinInterview() {
   const [micOn, setMicOn] = useState(true);
@@ -13,9 +17,30 @@ export default function JoinInterview() {
   const [question, setQuestion] = useState("");
   const [participantState, setParticipantState] = useState({ camOn: true, micOn: true });
   const [meetingStarted, setMeetingStarted] = useState(false);
+  const [roomID, setRoomID] = useState('');
+  const [copied, setCopied] = useState(false);
 
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
+
+  // Generate Room ID on mount
+  useEffect(() => {
+    const newRoomID = generateRoomID();
+    setRoomID(newRoomID);
+    
+    // Generate full shareable link
+    const participantLink = `${window.location.origin}/joinParticipant?room=${newRoomID}`;
+    
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log('🔑 NEW INTERVIEW ROOM CREATED');
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log('📋 Room ID:', newRoomID);
+    console.log('🔗 Participant Link:', participantLink);
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log('� Share this link with the participant to join:');
+    console.log('   ', participantLink);
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  }, []);
 
   // Initialize WebRTC (interviewer is the initiator)
   const {
@@ -27,7 +52,7 @@ export default function JoinInterview() {
     toggleVideo,
     toggleAudio,
     cleanup,
-  } = useWebRTC(socket, ROOM_ID, true);
+  } = useWebRTC(socket, roomID, true);
 
   // Initialize local stream on mount
   useEffect(() => {
@@ -102,10 +127,90 @@ export default function JoinInterview() {
     socket.emit("end-meeting");
   };
 
+  const copyRoomID = () => {
+    navigator.clipboard.writeText(roomID);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const copyParticipantLink = () => {
+    const participantLink = `${window.location.origin}/joinParticipant?room=${roomID}`;
+    navigator.clipboard.writeText(participantLink);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
   const formatTime = s => `${Math.floor(s/60).toString().padStart(2,'0')}:${(s%60).toString().padStart(2,'0')}`;
 
   return (
     <div className="interviewer-dashboard">
+      {/* Room ID Banner */}
+      {roomID && (
+        <div style={{
+          backgroundColor: '#4CAF50',
+          color: 'white',
+          padding: '15px 20px',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          gap: '15px',
+          fontWeight: 'bold',
+          fontSize: '16px',
+          boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+          flexWrap: 'wrap'
+        }}>
+          <span>🔑 Room ID:</span>
+          <code style={{
+            backgroundColor: 'rgba(255,255,255,0.2)',
+            padding: '5px 15px',
+            borderRadius: '5px',
+            fontSize: '18px',
+            letterSpacing: '1px'
+          }}>{roomID}</code>
+          <button 
+            onClick={copyRoomID}
+            style={{
+              backgroundColor: copied ? '#2196F3' : 'white',
+              color: copied ? 'white' : '#4CAF50',
+              border: 'none',
+              padding: '8px 15px',
+              borderRadius: '5px',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '5px',
+              fontWeight: 'bold',
+              transition: 'all 0.3s'
+            }}
+          >
+            <FaCopy />
+            {copied ? 'Copied!' : 'Copy ID'}
+          </button>
+          <button 
+            onClick={copyParticipantLink}
+            style={{
+              backgroundColor: copied ? '#2196F3' : 'white',
+              color: copied ? 'white' : '#4CAF50',
+              border: 'none',
+              padding: '8px 15px',
+              borderRadius: '5px',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '5px',
+              fontWeight: 'bold',
+              transition: 'all 0.3s'
+            }}
+          >
+            <FaCopy />
+            {copied ? 'Copied!' : 'Copy Link'}
+          </button>
+          <span style={{ fontSize: '14px', opacity: 0.9 }}>
+            📋 Share with participant
+          </span>
+        </div>
+      )}
+      
       {/* Header Section */}
       <div className="dashboard-header">
         <div className="header-left">
