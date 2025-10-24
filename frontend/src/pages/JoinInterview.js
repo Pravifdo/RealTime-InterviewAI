@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef } from "react";
 import { FaMicrophone, FaMicrophoneSlash, FaVideo, FaVideoSlash, FaPaperPlane, FaClock, FaUserTie, FaUserGraduate, FaPlay, FaStop, FaQuestionCircle, FaCopy } from "react-icons/fa";
 import { io } from "socket.io-client";
 import { useWebRTC } from "../hooks/useWebRTC";
+import PreInterviewSetup from "../components/PreInterviewSetup";
+import LiveEvaluationPanel from "../components/LiveEvaluationPanel";
 
 // Use environment variable or fallback to localhost
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || "http://localhost:5000";
@@ -21,6 +23,8 @@ export default function JoinInterview() {
   const [meetingStarted, setMeetingStarted] = useState(false);
   const [roomID, setRoomID] = useState('');
   const [copied, setCopied] = useState(false);
+  const [setupComplete, setSetupComplete] = useState(false);
+  const [savedQuestions, setSavedQuestions] = useState([]);
 
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
@@ -405,6 +409,24 @@ export default function JoinInterview() {
           </div>
         )}
       </div>
+
+      {/* Pre-Interview Setup or Live Evaluation Panel */}
+      {!setupComplete ? (
+        <PreInterviewSetup 
+          socket={socket} 
+          roomID={roomID} 
+          onSetupComplete={(questions) => {
+            setSavedQuestions(questions);
+            setSetupComplete(true);
+          }}
+        />
+      ) : (
+        <LiveEvaluationPanel 
+          socket={socket} 
+          roomID={roomID} 
+          savedQuestions={savedQuestions}
+        />
+      )}
 
       <style jsx>{`
         .interviewer-dashboard {

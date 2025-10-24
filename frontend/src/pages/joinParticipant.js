@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { FaMicrophone, FaMicrophoneSlash, FaVideo, FaVideoSlash, FaPaperPlane, FaClock, FaUserGraduate, FaUserTie, FaQuestionCircle, FaComment, FaSignInAlt } from "react-icons/fa";
 import { io } from "socket.io-client";
 import { useWebRTC } from "../hooks/useWebRTC";
+import { useSpeechRecognition } from "../hooks/useSpeechRecognition";
 
 // Use environment variable or fallback to localhost
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || "http://localhost:5000";
@@ -13,6 +14,8 @@ export default function JoinParticipant() {
   const [time, setTime] = useState(0);
   const [answer, setAnswer] = useState("");
   const [questions, setQuestions] = useState([]);
+  const [currentQuestion, setCurrentQuestion] = useState(null);
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(-1);
   const [interviewerState, setInterviewerState] = useState({ camOn: true, micOn: true });
   const [roomID, setRoomID] = useState('');
   const [roomIDInput, setRoomIDInput] = useState('');
@@ -20,6 +23,24 @@ export default function JoinParticipant() {
 
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
+  
+  // Speech recognition hook
+  const {
+    isListening,
+    transcript,
+    interimTranscript,
+    isSupported: isSpeechSupported,
+    startListening,
+    stopListening,
+    resetTranscript
+  } = useSpeechRecognition();
+  
+  // Update answer when speech transcript changes
+  useEffect(() => {
+    if (transcript) {
+      setAnswer(transcript);
+    }
+  }, [transcript]);
 
   // Check for Room ID in URL on mount
   useEffect(() => {
@@ -76,20 +97,51 @@ export default function JoinParticipant() {
 
   useEffect(() => {
     socket.on("update-interviewer", setInterviewerState);
-    socket.on("new-question", q => setQuestions(prev => [...prev, q]));
     socket.on("meeting-status", data => setTime(data.time));
     socket.on("meeting-ended", () => {
       alert("Interview ended by interviewer");
       setTime(0);
     });
 
+    // Listen for questions asked during interview (new flow)
+    socket.on("receive-question", (data) => {
+      console.log('📝 New question received:', data);
+      setCurrentQuestion(data.question);
+      setCurrentQuestionIndex(data.questionIndex);
+      setQuestions(prev => {
+        const updated = [...prev];
+        updated[data.questionIndex] = data.question;
+        return updated;
+      });
+    });
+
+    // Listen for answer submission confirmation
+    socket.on("answer-submitted", (data) => {
+      if (data.success) {
+        console.log('✅ Answer submitted successfully');
+        setAnswer('');
+        resetTranscript();
+      } else {
+        console.error('❌ Error submitting answer:', data.error);
+        alert('Error submitting answer: ' + data.error);
+      }
+    });
+
+    // Legacy support for old flow
+    socket.on("new-question", q => {
+      console.log('📝 Question (old flow):', q);
+      setQuestions(prev => [...prev, q]);
+    });
+
     return () => {
       socket.off("update-interviewer");
       socket.off("new-question");
+      socket.off("receive-question");
+      socket.off("answer-submitted");
       socket.off("meeting-status");
       socket.off("meeting-ended");
     };
-  }, []);
+  }, [resetTranscript]);
 
   const toggleMic = () => {
     const newMicState = !micOn;
@@ -107,8 +159,17 @@ export default function JoinParticipant() {
 
   const sendAnswer = () => {
     if(!answer.trim()) return;
-    socket.emit("new-answer", answer);
-    setAnswer("");
+    
+    // Use the new flow (submit-answer event)
+    socket.emit("submit-answer", {
+      answer: answer.trim(),
+      questionIndex: currentQuestionIndex >= 0 ? currentQuestionIndex : questions.length - 1,
+      roomId: roomID
+    });
+    
+    console.log('📤 Answer submitted for question', currentQuestionIndex >= 0 ? currentQuestionIndex + 1 : questions.length);
+    
+    // Note: Answer will be cleared by the answer-submitted event listener
   };
 
   const handleJoinRoom = () => {
