@@ -20,6 +20,18 @@ export const useWebRTC = (socket, roomId, isInitiator) => {
   // Initialize local media stream
   const initLocalStream = async (videoEnabled = true, audioEnabled = true) => {
     try {
+      // Check if mediaDevices API is available
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        console.error('getUserMedia is not supported in this browser/context');
+        const errorMsg = 'Camera/Microphone access is not available. This may be because:\n' +
+          '1. You are using HTTP instead of HTTPS (required for remote access)\n' +
+          '2. Your browser does not support WebRTC\n' +
+          '3. Media devices API is disabled\n\n' +
+          'Try: Use Chrome or Edge browser, or access from the same computer (localhost)';
+        setError(errorMsg);
+        throw new Error(errorMsg);
+      }
+
       const stream = await navigator.mediaDevices.getUserMedia({
         video: videoEnabled,
         audio: audioEnabled,
@@ -31,7 +43,26 @@ export const useWebRTC = (socket, roomId, isInitiator) => {
       return stream;
     } catch (err) {
       console.error('Error accessing media devices:', err);
-      setError('Camera/Microphone access denied. Please allow permissions.');
+      
+      let errorMessage = 'Camera/Microphone access failed. ';
+      
+      if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+        errorMessage += 'Please allow camera and microphone permissions in your browser.';
+      } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
+        errorMessage += 'No camera or microphone found on your device.';
+      } else if (err.name === 'NotReadableError' || err.name === 'TrackStartError') {
+        errorMessage += 'Camera/Microphone is already in use by another application.';
+      } else if (err.name === 'OverconstrainedError' || err.name === 'ConstraintNotSatisfiedError') {
+        errorMessage += 'Camera/Microphone does not meet requirements.';
+      } else if (err.name === 'NotSupportedError') {
+        errorMessage += 'HTTPS is required for camera/microphone access over network.';
+      } else if (err.name === 'TypeError') {
+        errorMessage += 'HTTPS is required for camera/microphone access. Ask interviewer to use HTTPS or localhost.';
+      } else {
+        errorMessage += err.message || 'Unknown error occurred.';
+      }
+      
+      setError(errorMessage);
       throw err;
     }
   };

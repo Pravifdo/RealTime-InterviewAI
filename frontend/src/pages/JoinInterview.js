@@ -3,7 +3,9 @@ import { FaMicrophone, FaMicrophoneSlash, FaVideo, FaVideoSlash, FaPaperPlane, F
 import { io } from "socket.io-client";
 import { useWebRTC } from "../hooks/useWebRTC";
 
-const socket = io("http://localhost:5000");
+// Use environment variable or fallback to localhost
+const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || "http://localhost:5000";
+const socket = io(BACKEND_URL);
 
 // Generate unique Room ID
 const generateRoomID = () => {

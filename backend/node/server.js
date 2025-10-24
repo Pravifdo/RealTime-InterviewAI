@@ -5,6 +5,10 @@ const mongoose = require('mongoose');
 const dotenv = require('dotenv');
 const cors = require('cors');
 
+// Import models and utilities
+const Evaluation = require('./src/models/Evaluation');
+const { extractKeywords, evaluateAnswer } = require('./src/utils/keywordExtractor');
+
 dotenv.config();
 const app = express();
 app.use(cors());
@@ -122,16 +126,135 @@ io.on("connection",(socket) =>{
   }
  });
 
- // Handle questions from interviewer
- socket.on('new-question', (question) => {
-   console.log("New question:", question);
-   io.emit('new-question', question);
+ // Handle questions from interviewer with keywords
+ socket.on('new-question', async (data) => {
+   console.log("New question:", data);
+   
+   // data can be {question: string, keywords: []} or just a string
+   const questionData = typeof data === 'string' 
+     ? { question: data, keywords: [] }
+     : data;
+   
+   // Auto-extract keywords if not provided
+   if (!questionData.keywords || questionData.keywords.length === 0) {
+     questionData.keywords = extractKeywords(questionData.question);
+   }
+   
+   console.log("Question keywords:", questionData.keywords);
+   io.emit('new-question', questionData);
  });
 
- // Handle answers from participant
- socket.on('new-answer', (answer) => {
-   console.log("New answer:", answer);
-   io.emit('new-answer', answer);
+ // Handle answers from participant with auto-evaluation
+ socket.on('new-answer', async (data) => {
+   console.log("New answer received:", data);
+   
+   // data should be {answer: string, questionIndex: number, roomId: string, expectedKeywords: []}
+   const { answer, questionIndex, roomId, expectedKeywords = [] } = typeof data === 'string'
+     ? { answer: data, questionIndex: 0, roomId: socket.roomId, expectedKeywords: [] }
+     : data;
+   
+   try {
+     // Evaluate the answer
+     const evaluation = evaluateAnswer(answer, expectedKeywords);
+     
+     console.log("Answer evaluation:", {
+       score: evaluation.score,
+       matchedKeywords: evaluation.matchedKeywords,
+       participantKeywords: evaluation.participantKeywords
+     });
+     
+     // Broadcast evaluation results
+     io.emit('answer-evaluated', {
+       questionIndex,
+       answer,
+       evaluation: {
+         score: evaluation.score,
+         matchedKeywords: evaluation.matchedKeywords,
+         participantKeywords: evaluation.participantKeywords,
+         matchPercentage: evaluation.matchPercentage
+       }
+     });
+     
+     // Save to database if roomId exists
+     if (roomId) {
+       let session = await Evaluation.findOne({ roomId, status: 'ongoing' });
+       
+       if (!session) {
+         session = new Evaluation({
+           sessionId: `session-${Date.now()}`,
+           roomId,
+           questionsAnswers: []
+         });
+       }
+       
+       // Update or add question-answer
+       if (session.questionsAnswers[questionIndex]) {
+         session.questionsAnswers[questionIndex].participantAnswer = answer;
+         session.questionsAnswers[questionIndex].extractedKeywords = evaluation.participantKeywords;
+         session.questionsAnswers[questionIndex].matchedKeywords = evaluation.matchedKeywords;
+         session.questionsAnswers[questionIndex].score = evaluation.score;
+       } else {
+         session.questionsAnswers.push({
+           question: '', // Will be updated when question is sent
+           expectedKeywords,
+           participantAnswer: answer,
+           extractedKeywords: evaluation.participantKeywords,
+           matchedKeywords: evaluation.matchedKeywords,
+           score: evaluation.score
+         });
+       }
+       
+       // Calculate average
+       session.calculateAverage();
+       await session.save();
+       
+       console.log("Evaluation saved. Average score:", session.averageScore);
+       
+       // Broadcast updated scores
+       io.emit('scores-updated', {
+         averageScore: session.averageScore,
+         totalQuestions: session.totalQuestions,
+         scores: session.questionsAnswers.map(qa => qa.score)
+       });
+     }
+   } catch (error) {
+     console.error("Error evaluating answer:", error);
+   }
+ });
+ 
+ // New event: Save question with keywords
+ socket.on('save-question', async (data) => {
+   const { question, keywords, roomId, questionIndex } = data;
+   
+   try {
+     let session = await Evaluation.findOne({ roomId, status: 'ongoing' });
+     
+     if (!session) {
+       session = new Evaluation({
+         sessionId: `session-${Date.now()}`,
+         roomId,
+         questionsAnswers: []
+       });
+     }
+     
+     // Add or update question
+     if (session.questionsAnswers[questionIndex]) {
+       session.questionsAnswers[questionIndex].question = question;
+       session.questionsAnswers[questionIndex].expectedKeywords = keywords;
+     } else {
+       session.questionsAnswers.push({
+         question,
+         expectedKeywords: keywords,
+         participantAnswer: '',
+         score: 0
+       });
+     }
+     
+     await session.save();
+     console.log("Question saved with keywords");
+   } catch (error) {
+     console.error("Error saving question:", error);
+   }
  });
 
   socket.on("disconnect",() =>{
