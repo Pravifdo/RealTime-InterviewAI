@@ -12,6 +12,7 @@ import {
   JoinInterview
 } from './pages';
 import JoinParticipant from './pages/joinParticipant';
+import TemplateManagement from './pages/TemplateManagement';
 
 function App() {
   return (
@@ -24,6 +25,7 @@ function App() {
         <Route path="/interviewer" element={<InterviewerDashboard />} />
         <Route path="/joinParticipant" element={<JoinParticipant />} />
         <Route path="/JoinInterview" element={<JoinInterview />} />
+        <Route path="/templates" element={<TemplateManagement />} />
       </Routes>
     </Router>
   );

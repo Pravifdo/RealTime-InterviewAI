@@ -24,6 +24,21 @@ const QuestionAnswerSchema = new mongoose.Schema({
     min: 0,
     max: 100
   },
+  aiFeedback: {
+    type: String,
+    default: ''
+  },
+  aiStrengths: [{
+    type: String
+  }],
+  aiImprovements: [{
+    type: String
+  }],
+  evaluationType: {
+    type: String,
+    enum: ['AI', 'Keyword', 'Keyword (Fallback)'],
+    default: 'Keyword'
+  },
   timestamp: {
     type: Date,
     default: Date.now

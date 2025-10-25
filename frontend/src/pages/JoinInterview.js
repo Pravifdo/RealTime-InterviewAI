@@ -2,12 +2,20 @@ import React, { useState, useEffect, useRef } from "react";
 import { FaMicrophone, FaMicrophoneSlash, FaVideo, FaVideoSlash, FaPaperPlane, FaClock, FaUserTie, FaUserGraduate, FaPlay, FaStop, FaQuestionCircle, FaCopy } from "react-icons/fa";
 import { io } from "socket.io-client";
 import { useWebRTC } from "../hooks/useWebRTC";
-import PreInterviewSetup from "../components/PreInterviewSetup";
+import LoadTemplateByID from "../components/LoadTemplateByID";
 import LiveEvaluationPanel from "../components/LiveEvaluationPanel";
 
 // Use environment variable or fallback to localhost
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || "http://localhost:5000";
-const socket = io(BACKEND_URL);
+const socket = io(BACKEND_URL, {
+  transports: ['polling', 'websocket'], // Try polling first, then upgrade to websocket
+  reconnection: true,
+  reconnectionAttempts: 5,
+  reconnectionDelay: 1000,
+  timeout: 10000,
+  autoConnect: true,
+  forceNew: false
+});
 
 // Generate unique Room ID
 const generateRoomID = () => {
@@ -25,6 +33,7 @@ export default function JoinInterview() {
   const [copied, setCopied] = useState(false);
   const [setupComplete, setSetupComplete] = useState(false);
   const [savedQuestions, setSavedQuestions] = useState([]);
+  const [templateId, setTemplateId] = useState(null);
 
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
@@ -410,13 +419,14 @@ export default function JoinInterview() {
         )}
       </div>
 
-      {/* Pre-Interview Setup or Live Evaluation Panel */}
+      {/* Load Template or Live Evaluation Panel */}
       {!setupComplete ? (
-        <PreInterviewSetup 
+        <LoadTemplateByID 
           socket={socket} 
           roomID={roomID} 
-          onSetupComplete={(questions) => {
+          onTemplateLoaded={(questions, loadedTemplateId) => {
             setSavedQuestions(questions);
+            setTemplateId(loadedTemplateId);
             setSetupComplete(true);
           }}
         />
@@ -425,6 +435,7 @@ export default function JoinInterview() {
           socket={socket} 
           roomID={roomID} 
           savedQuestions={savedQuestions}
+          templateId={templateId}
         />
       )}
 

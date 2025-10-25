@@ -183,34 +183,104 @@
   border-top: 1px solid #e2e8f0;
 }
 
-.keywords-match {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+.ai-badge {
+  display: inline-block;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 700;
+  margin-bottom: 12px;
+}
+
+.ai-feedback {
+  background: #ebf8ff;
+  padding: 12px;
+  border-radius: 8px;
+  border-left: 4px solid #4299e1;
+  margin-bottom: 12px;
+}
+
+.ai-feedback strong {
+  color: #2c5282;
+  display: block;
+  margin-bottom: 6px;
   font-size: 13px;
 }
 
-.keywords-match > div {
-  padding: 8px 12px;
-  background: white;
-  border-radius: 6px;
-  border-left: 3px solid #cbd5e0;
+.ai-feedback p {
+  margin: 0;
+  color: #2d3748;
+  font-size: 14px;
+  line-height: 1.6;
 }
 
-.keywords-match .matched {
-  border-left-color: #48bb78;
+.strengths-section {
   background: #f0fff4;
+  padding: 12px;
+  border-radius: 8px;
+  border-left: 4px solid #48bb78;
+  margin-bottom: 12px;
 }
 
-.keywords-match .participant {
-  border-left-color: #4299e1;
-  background: #ebf8ff;
+.strengths-section strong {
+  color: #22543d;
+  display: block;
+  margin-bottom: 8px;
+  font-size: 13px;
 }
 
-.keywords-match .match-percentage {
-  border-left-color: #ed8936;
+.strengths-section ul {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.strengths-section li {
+  color: #2d3748;
+  font-size: 13px;
+  margin-bottom: 4px;
+  line-height: 1.5;
+}
+
+.improvements-section {
   background: #fffaf0;
-  font-weight: 600;
+  padding: 12px;
+  border-radius: 8px;
+  border-left: 4px solid #ed8936;
+  margin-bottom: 12px;
+}
+
+.improvements-section strong {
+  color: #7c2d12;
+  display: block;
+  margin-bottom: 8px;
+  font-size: 13px;
+}
+
+.improvements-section ul {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.improvements-section li {
+  color: #2d3748;
+  font-size: 13px;
+  margin-bottom: 4px;
+  line-height: 1.5;
+}
+
+.concepts-match {
+  padding: 10px 12px;
+  background: #faf5ff;
+  border-radius: 6px;
+  font-size: 13px;
+  border-left: 3px solid #9f7aea;
+  color: #44337a;
+}
+
+.concepts-match strong {
+  color: #44337a;
 }
 
 .expected-keywords {

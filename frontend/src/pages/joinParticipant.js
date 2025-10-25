@@ -4,9 +4,16 @@ import { io } from "socket.io-client";
 import { useWebRTC } from "../hooks/useWebRTC";
 import { useSpeechRecognition } from "../hooks/useSpeechRecognition";
 
-// Use environment variable or fallback to localhost
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || "http://localhost:5000";
-const socket = io(BACKEND_URL);
+const socket = io(BACKEND_URL, {
+  transports: ['polling', 'websocket'], // Try polling first, then upgrade to websocket
+  reconnection: true,
+  reconnectionAttempts: 5,
+  reconnectionDelay: 1000,
+  timeout: 10000,
+  autoConnect: true,
+  forceNew: false
+});
 
 export default function JoinParticipant() {
   const [micOn, setMicOn] = useState(true);
@@ -16,6 +23,7 @@ export default function JoinParticipant() {
   const [questions, setQuestions] = useState([]);
   const [currentQuestion, setCurrentQuestion] = useState(null);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(-1);
+  const [templateId, setTemplateId] = useState(null);
   const [interviewerState, setInterviewerState] = useState({ camOn: true, micOn: true });
   const [roomID, setRoomID] = useState('');
   const [roomIDInput, setRoomIDInput] = useState('');
@@ -164,7 +172,8 @@ export default function JoinParticipant() {
     socket.emit("submit-answer", {
       answer: answer.trim(),
       questionIndex: currentQuestionIndex >= 0 ? currentQuestionIndex : questions.length - 1,
-      roomId: roomID
+      roomId: roomID,
+      templateId: templateId
     });
     
     console.log('📤 Answer submitted for question', currentQuestionIndex >= 0 ? currentQuestionIndex + 1 : questions.length);

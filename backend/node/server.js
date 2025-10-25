@@ -9,6 +9,7 @@ const cors = require('cors');
 const Evaluation = require('./src/models/Evaluation');
 const InterviewTemplate = require('./src/models/InterviewTemplate');
 const { extractKeywords, evaluateAnswer } = require('./src/utils/keywordExtractor');
+const { evaluateAnswerWithAI, generateInterviewSummary } = require('./src/utils/aiEvaluator');
 
 dotenv.config();
 const app = express();
@@ -16,14 +17,22 @@ app.use(cors());
 app.use(express.json());
 
 const server = http.createServer(app);
-const io = new Server(server,{
+const io = new Server(server, {
   cors: {
-    origin:"*",
-  }
+    origin: "*",
+    methods: ["GET", "POST"],
+    credentials: true
+  },
+  transports: ['websocket', 'polling'],
+  allowEIO3: true,
+  pingTimeout: 60000,
+  pingInterval: 25000
 });
 // Routes
 const authRoutes = require('./src/controllers/authController');
+const interviewRoutes = require('./src/routes/interviews');
 app.use('/api/auth', authRoutes);
+app.use('/api/interviews', interviewRoutes);
 
 // Connect MongoDB
 mongoose.connect(process.env.MONGO_URI)
@@ -46,14 +55,33 @@ function getMeetingTime() {
   return Math.floor((Date.now() - meetingStartTime) / 1000);
 }
 
+// Socket.IO connection logging
+io.engine.on("connection_error", (err) => {
+  console.error("🔴 Socket.IO Connection Error:");
+  console.error("  Code:", err.code);
+  console.error("  Message:", err.message);
+  console.error("  Context:", err.context);
+});
+
+console.log('Socket.io is running');
+
 //Socket.io realtime connection
-io.on("connection",(socket) =>{
-  console.log(`User connected: ${socket.id}`);
+io.on("connection", (socket) => {
+  console.log(`✅ User connected: ${socket.id} from ${socket.handshake.address}`);
 
   //Send current states when user connects
   socket.emit("update-interviewer",interviewerState);
   socket.emit("update-participant",participantState);
   socket.emit('meeting-status', { meetingState, time: getMeetingTime()});
+
+  // Handle disconnection
+  socket.on('disconnect', (reason) => {
+    console.log(`❌ User disconnected: ${socket.id}, Reason: ${reason}`);
+  });
+
+  socket.on('error', (error) => {
+    console.error(`🔴 Socket error for ${socket.id}:`, error);
+  });
 
   // WebRTC Signaling Events
   socket.on('join-room', (roomId) => {
@@ -260,6 +288,47 @@ io.on("connection",(socket) =>{
 
  // ==================== PRE-INTERVIEW SETUP EVENTS ====================
  
+ // Load template by ID and assign to room
+ socket.on('load-template-by-id', async (data) => {
+   const { templateId, roomId } = data;
+   
+   try {
+     const template = await InterviewTemplate.findById(templateId);
+     
+     if (!template) {
+       socket.emit('template-loaded', {
+         success: false,
+         error: 'Template not found'
+       });
+       return;
+     }
+     
+     console.log(`📋 Loaded template "${template.title}" (ID: ${templateId}) for room ${roomId}`);
+     console.log(`   Questions: ${template.questions.length}`);
+     
+     // Create a room-specific copy or just use the template directly
+     socket.emit('template-loaded', {
+       success: true,
+       templateId: template._id,
+       title: template.title,
+       questions: template.questions.map(q => ({
+         question: q.question,
+         keywords: q.expectedKeywords,
+         category: q.category,
+         difficulty: q.difficulty
+       })),
+       roomId: roomId
+     });
+     
+   } catch (error) {
+     console.error("Error loading template by ID:", error);
+     socket.emit('template-loaded', {
+       success: false,
+       error: error.message
+     });
+   }
+ });
+ 
  // Save pre-interview questions and keywords
  socket.on('save-interview-template', async (data) => {
    const { roomId, questions, title } = data;
@@ -334,10 +403,16 @@ io.on("connection",(socket) =>{
  
  // Ask a question during interview (using pre-saved keywords)
  socket.on('ask-question', async (data) => {
-   const { roomId, questionIndex } = data;
+   const { roomId, questionIndex, templateId } = data;
    
    try {
-     const template = await InterviewTemplate.findOne({ roomId });
+     // Try to find by templateId first, then fall back to roomId
+     let template;
+     if (templateId) {
+       template = await InterviewTemplate.findById(templateId);
+     } else {
+       template = await InterviewTemplate.findOne({ roomId });
+     }
      
      if (template && template.questions[questionIndex]) {
        const question = template.questions[questionIndex];
@@ -374,10 +449,16 @@ io.on("connection",(socket) =>{
  
  // Evaluate participant answer using pre-saved keywords
  socket.on('submit-answer', async (data) => {
-   const { roomId, questionIndex, answer } = data;
+   const { roomId, questionIndex, answer, templateId } = data;
    
    try {
-     const template = await InterviewTemplate.findOne({ roomId });
+     // Try to find by templateId first, then fall back to roomId
+     let template;
+     if (templateId) {
+       template = await InterviewTemplate.findById(templateId);
+     } else {
+       template = await InterviewTemplate.findOne({ roomId });
+     }
      
      if (!template || !template.questions[questionIndex]) {
        throw new Error('Question template not found');
@@ -386,13 +467,19 @@ io.on("connection",(socket) =>{
      const question = template.questions[questionIndex];
      const expectedKeywords = question.expectedKeywords;
      
-     // Auto-evaluate using saved keywords
-     const evaluation = evaluateAnswer(answer, expectedKeywords);
+     console.log(`🤖 Starting AI evaluation for Q${questionIndex + 1}...`);
      
-     console.log(`🎯 Answer evaluated for Q${questionIndex + 1}:`, {
+     // Use AI evaluation instead of keyword matching
+     const evaluation = await evaluateAnswerWithAI(
+       question.question,
+       answer,
+       expectedKeywords
+     );
+     
+     console.log(`✨ AI Evaluation complete for Q${questionIndex + 1}:`, {
        score: evaluation.score,
-       matched: evaluation.matchedKeywords.length,
-       total: expectedKeywords.length
+       type: evaluation.evaluationType,
+       concepts: evaluation.matchedConcepts.length
      });
      
      // Save to evaluation session
@@ -416,14 +503,18 @@ io.on("connection",(socket) =>{
        });
      }
      
-     // Update with answer and evaluation
+     // Update with answer and AI evaluation
      session.questionsAnswers[questionIndex] = {
        question: question.question,
        expectedKeywords: expectedKeywords,
        participantAnswer: answer,
-       extractedKeywords: evaluation.participantKeywords,
-       matchedKeywords: evaluation.matchedKeywords,
+       extractedKeywords: evaluation.matchedConcepts || [],
+       matchedKeywords: evaluation.matchedConcepts || [],
        score: evaluation.score,
+       aiFeedback: evaluation.feedback,
+       aiStrengths: evaluation.strengths,
+       aiImprovements: evaluation.improvements,
+       evaluationType: evaluation.evaluationType,
        timestamp: new Date()
      };
      
@@ -431,15 +522,17 @@ io.on("connection",(socket) =>{
      session.calculateAverage();
      await session.save();
      
-     console.log(`💾 Evaluation saved. Average score: ${session.averageScore}%`);
+     console.log(`💾 AI Evaluation saved. Average score: ${session.averageScore}%`);
      
-     // Broadcast evaluation results to interviewer
+     // Broadcast AI evaluation results to interviewer
      io.to(roomId).emit('answer-evaluated', {
        questionIndex,
        score: evaluation.score,
-       matchedKeywords: evaluation.matchedKeywords,
-       participantKeywords: evaluation.participantKeywords,
-       matchPercentage: evaluation.matchPercentage,
+       feedback: evaluation.feedback,
+       strengths: evaluation.strengths,
+       improvements: evaluation.improvements,
+       matchedConcepts: evaluation.matchedConcepts,
+       evaluationType: evaluation.evaluationType,
        averageScore: session.averageScore,
        totalQuestions: session.questionsAnswers.filter(qa => qa.participantAnswer).length
      });
@@ -464,8 +557,24 @@ io.on("connection",(socket) =>{
   });
 });
 
-console.log("Socket.io is running");
 const PORT = process.env.PORT || 5000;
-server.listen(PORT, () => {
-  console.log(`🚀 Server running on http://localhost:${PORT}`);
+server.listen(PORT, '0.0.0.0', () => {
+  const os = require('os');
+  const networkInterfaces = os.networkInterfaces();
+  const ipAddresses = [];
+  
+  // Get all IPv4 addresses
+  Object.keys(networkInterfaces).forEach(interfaceName => {
+    networkInterfaces[interfaceName].forEach(iface => {
+      if (iface.family === 'IPv4' && !iface.internal) {
+        ipAddresses.push(iface.address);
+      }
+    });
+  });
+  
+  console.log(`🚀 Server running on:`);
+  console.log(`   - Local: http://localhost:${PORT}`);
+  ipAddresses.forEach(ip => {
+    console.log(`   - Network: http://${ip}:${PORT}`);
+  });
 });

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import './LiveEvaluationPanel.css';
 
-export default function LiveEvaluationPanel({ socket, roomID, savedQuestions }) {
+export default function LiveEvaluationPanel({ socket, roomID, savedQuestions, templateId }) {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [evaluations, setEvaluations] = useState([]);
   const [averageScore, setAverageScore] = useState(0);
@@ -12,16 +12,18 @@ export default function LiveEvaluationPanel({ socket, roomID, savedQuestions }) 
 
     // Listen for answer evaluations
     socket.on('answer-evaluated', (data) => {
-      console.log('Answer evaluated:', data);
+      console.log('AI Answer evaluated:', data);
       
       // Update evaluations
       setEvaluations(prev => {
         const newEvals = [...prev];
         newEvals[data.questionIndex] = {
           score: data.score,
-          matchedKeywords: data.matchedKeywords,
-          participantKeywords: data.participantKeywords,
-          matchPercentage: data.matchPercentage
+          feedback: data.feedback,
+          strengths: data.strengths || [],
+          improvements: data.improvements || [],
+          matchedConcepts: data.matchedConcepts || [],
+          evaluationType: data.evaluationType || 'AI'
         };
         return newEvals;
       });
@@ -51,11 +53,12 @@ export default function LiveEvaluationPanel({ socket, roomID, savedQuestions }) 
 
     socket.emit('ask-question', {
       roomId: roomID,
-      questionIndex: index
+      questionIndex: index,
+      templateId: templateId
     });
 
     setCurrentQuestionIndex(index);
-    console.log(`Asking question ${index + 1}`);
+    console.log(`Asking question ${index + 1} (Template ID: ${templateId})`);
   };
 
   const askNextQuestion = () => {
@@ -150,20 +153,40 @@ export default function LiveEvaluationPanel({ socket, roomID, savedQuestions }) 
 
                 {evaluation && (
                   <div className="evaluation-details">
-                    <div className="keywords-match">
-                      <div className="matched">
-                        <strong>Matched Keywords:</strong>{' '}
-                        {evaluation.matchedKeywords.length > 0 
-                          ? evaluation.matchedKeywords.join(', ')
-                          : 'None'}
+                    <div className="ai-badge">{evaluation.evaluationType}</div>
+                    
+                    <div className="ai-feedback">
+                      <strong>AI Feedback:</strong>
+                      <p>{evaluation.feedback}</p>
+                    </div>
+                    
+                    {evaluation.strengths && evaluation.strengths.length > 0 && (
+                      <div className="strengths-section">
+                        <strong>✅ Strengths:</strong>
+                        <ul>
+                          {evaluation.strengths.map((s, i) => (
+                            <li key={i}>{s}</li>
+                          ))}
+                        </ul>
                       </div>
-                      <div className="participant">
-                        <strong>Participant Keywords:</strong>{' '}
-                        {evaluation.participantKeywords.join(', ')}
+                    )}
+                    
+                    {evaluation.improvements && evaluation.improvements.length > 0 && (
+                      <div className="improvements-section">
+                        <strong>📈 Improvements:</strong>
+                        <ul>
+                          {evaluation.improvements.map((imp, i) => (
+                            <li key={i}>{imp}</li>
+                          ))}
+                        </ul>
                       </div>
-                      <div className="match-percentage">
-                        Match: {evaluation.matchPercentage.toFixed(0)}%
-                      </div>
+                    )}
+                    
+                    <div className="concepts-match">
+                      <strong>Covered Concepts:</strong>{' '}
+                      {evaluation.matchedConcepts.length > 0 
+                        ? evaluation.matchedConcepts.join(', ')
+                        : 'None identified'}
                     </div>
                   </div>
                 )}
