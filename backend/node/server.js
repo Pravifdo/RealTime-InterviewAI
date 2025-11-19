@@ -574,6 +574,7 @@ server.listen(PORT, '0.0.0.0', () => {
   
   console.log(`🚀 Server running on:`);
   console.log(`   - Local: http://localhost:${PORT}`);
+  console.log(`   - Digital Ocean: http://142.93.220.168:${PORT}`);
   ipAddresses.forEach(ip => {
     console.log(`   - Network: http://${ip}:${PORT}`);
   });

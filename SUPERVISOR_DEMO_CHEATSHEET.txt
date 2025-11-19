@@ -1,0 +1,219 @@
+┌─────────────────────────────────────────────────────────────────┐
+│  🎯 INTERVIEW APP - SUPERVISOR DEMO SETUP                       │
+│  Quick Reference for 2-Device Demonstration                     │
+└─────────────────────────────────────────────────────────────────┘
+
+═══════════════════════════════════════════════════════════════════
+📋 PROBLEM YOU'RE SOLVING
+═══════════════════════════════════════════════════════════════════
+
+Current Error: "Mixed Content: The page at 'https://...' was loaded 
+over HTTPS, but requested an insecure resource 'http://...'"
+
+Why: Browsers block HTTPS pages from connecting to HTTP backends.
+Solution: Use ngrok to expose BOTH frontend AND backend over HTTPS.
+
+═══════════════════════════════════════════════════════════════════
+⚡ FASTEST SETUP (5 Minutes)
+═══════════════════════════════════════════════════════════════════
+
+1. START SERVERS (if not running):
+   .\start-servers.ps1
+
+2. RUN NGROK FOR BACKEND:
+   Terminal 1: ngrok http 5000
+   → Copy HTTPS URL: https://abc-123-xyz.ngrok-free.app
+
+3. CONFIGURE FRONTEND:
+   .\setup-ngrok-demo.ps1
+   → Paste backend URL when prompted
+
+4. RESTART FRONTEND:
+   In frontend terminal:
+   - Press Ctrl+C
+   - Run: npm start
+
+5. RUN NGROK FOR FRONTEND:
+   Terminal 2: ngrok http 3000
+   → Copy HTTPS URL: https://def-456-uvw.ngrok-free.app
+
+6. DEMO URL:
+   https://def-456-uvw.ngrok-free.app/joinInterview
+
+═══════════════════════════════════════════════════════════════════
+🔧 MANUAL SETUP (if script doesn't work)
+═══════════════════════════════════════════════════════════════════
+
+Step 1: Start Backend
+  cd backend\node
+  npm run dev
+
+Step 2: Start Frontend  
+  cd frontend
+  npm start
+
+Step 3: Backend Ngrok Tunnel
+  ngrok http 5000
+  Copy URL: https://YOUR-BACKEND.ngrok-free.app
+
+Step 4: Update Frontend Config
+  Create: frontend\.env.local
+  Add: REACT_APP_BACKEND_URL=https://YOUR-BACKEND.ngrok-free.app
+
+Step 5: Restart Frontend
+  Ctrl+C in frontend terminal
+  npm start
+
+Step 6: Frontend Ngrok Tunnel
+  ngrok http 3000
+  Copy URL: https://YOUR-FRONTEND.ngrok-free.app
+
+═══════════════════════════════════════════════════════════════════
+📱 DEMO EXECUTION
+═══════════════════════════════════════════════════════════════════
+
+Device 1 (Supervisor - Interviewer):
+┌───────────────────────────────────────────────────────┐
+│ URL: https://YOUR-FRONTEND.ngrok-free.app/joinInterview │
+│                                                        │
+│ Actions:                                               │
+│ 1. Open URL in browser                                 │
+│ 2. Allow camera/microphone                             │
+│ 3. Click "Load Template" or create questions           │
+│ 4. Copy Room ID (e.g., room-abc123)                    │
+│ 5. Share participant link with Device 2                │
+│ 6. Click "Ask Question" to send to participant         │
+│ 7. View live evaluation scores                         │
+└────────────────────────────────────────────────────────┘
+
+Device 2 (You - Participant):
+┌───────────────────────────────────────────────────────┐
+│ URL: https://YOUR-FRONTEND.ngrok-free.app/joinParticipant?room=ROOM_ID │
+│                                                        │
+│ Actions:                                               │
+│ 1. Open participant link from Device 1                 │
+│ 2. Allow camera/microphone                             │
+│ 3. Wait for question from interviewer                  │
+│ 4. Answer question (voice or text)                     │
+│ 5. Submit answer                                       │
+│ 6. AI evaluates and shows score to interviewer         │
+└────────────────────────────────────────────────────────┘
+
+═══════════════════════════════════════════════════════════════════
+✅ VERIFICATION CHECKLIST
+═══════════════════════════════════════════════════════════════════
+
+Before Starting Demo:
+[ ] Backend server running (green checkmark in terminal)
+[ ] Frontend server running (compiled successfully)
+[ ] Backend ngrok tunnel active
+[ ] Frontend .env.local created with backend ngrok URL
+[ ] Frontend restarted after .env.local update
+[ ] Frontend ngrok tunnel active
+
+Test on Device 1 (same device as servers):
+[ ] Open frontend ngrok URL
+[ ] No "Mixed Content" errors in console (F12)
+[ ] Templates load (or can create questions)
+[ ] Socket.IO shows "connected"
+[ ] Room ID generated successfully
+
+Test on Device 2 (different device):
+[ ] Participant link opens
+[ ] Can see video/audio controls
+[ ] No errors in console
+
+═══════════════════════════════════════════════════════════════════
+🚨 TROUBLESHOOTING
+═══════════════════════════════════════════════════════════════════
+
+Error: "Mixed Content: blocked HTTP request from HTTPS page"
+Fix: Make sure frontend .env.local has HTTPS backend URL (ngrok)
+
+Error: "Failed to fetch templates"
+Fix: 
+  1. Check backend ngrok tunnel is running
+  2. Verify .env.local has correct backend URL
+  3. Restart frontend
+
+Error: "WebSocket connection failed"
+Fix:
+  1. Backend is configured for all origins (*)
+  2. Check both ngrok tunnels are active
+  3. Clear browser cache (Ctrl+Shift+R)
+
+Error: "ERR_NGROK_6024" (session limit)
+Fix: Free ngrok = 1 tunnel at a time
+  1. Get auth token: ngrok authtoken YOUR_TOKEN
+  2. Or use paid plan for multiple tunnels
+
+Error: Camera/Mic not working
+Fix:
+  1. Click lock icon in browser address bar
+  2. Allow camera and microphone
+  3. Refresh page
+
+Error: Participant can't join room
+Fix:
+  1. Make sure Room ID is correct
+  2. Check interviewer created room first
+  3. Verify both using same frontend ngrok URL
+
+═══════════════════════════════════════════════════════════════════
+💡 PRO TIPS
+═══════════════════════════════════════════════════════════════════
+
+1. Keep 4 terminal windows organized:
+   - Terminal 1: Backend (npm run dev)
+   - Terminal 2: Frontend (npm start)  
+   - Terminal 3: Backend ngrok
+   - Terminal 4: Frontend ngrok
+
+2. Ngrok tunnels expire after 2 hours (free tier)
+   - Be ready to restart and update URLs
+
+3. Test locally first (http://localhost:3000)
+   - Verify everything works before using ngrok
+
+4. Have a backup plan:
+   - Test on same WiFi network using local IP
+   - URL: http://10.4.2.1:3000 (if ngrok fails)
+
+5. Browser compatibility:
+   - Use Chrome or Edge (best WebRTC support)
+   - Avoid Firefox (may have issues)
+
+6. Gemini AI Key:
+   - If not added, system uses keyword matching
+   - Add to backend/node/.env: GEMINI_API_KEY=xxx
+
+═══════════════════════════════════════════════════════════════════
+📞 QUICK COMMANDS REFERENCE
+═══════════════════════════════════════════════════════════════════
+
+Start everything:        .\start-servers.ps1
+Setup ngrok:            .\setup-ngrok-demo.ps1
+Backend ngrok:          ngrok http 5000
+Frontend ngrok:         ngrok http 3000
+Restart frontend:       Ctrl+C then npm start
+Kill all node:          Get-Process node | Stop-Process -Force
+Check ports:            netstat -ano | Select-String ":5000"
+View logs:              Check terminal windows
+
+═══════════════════════════════════════════════════════════════════
+📄 FILE LOCATIONS
+═══════════════════════════════════════════════════════════════════
+
+Frontend config:        frontend\.env.local (you create this)
+Backend config:         backend\node\.env
+Templates page:         /templates (create questions/keywords)
+Interviewer page:       /joinInterview
+Participant page:       /joinParticipant?room=ROOM_ID
+
+═══════════════════════════════════════════════════════════════════
+
+Good luck with your supervisor demonstration! 🎓✨
+
+For detailed guides, see:
+- NGROK_SETUP_GUIDE.md (full explanation)
+- DEMO_QUICK_START.md (condensed version)

@@ -46,7 +46,8 @@ function Login() {
     setError('');
 
     try {
-      const response = await axios.post('http://localhost:5000/api/auth/login', { 
+      const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:5000';
+      const response = await axios.post(`${BACKEND_URL}/api/auth/login`, { 
         email, 
         password, 
         role 

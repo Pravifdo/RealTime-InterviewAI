@@ -108,7 +108,7 @@ export default function TemplateManagement() {
     if (!window.confirm(`Delete template "${title}"?`)) return;
 
     try {
-      const response = await fetch(`http://localhost:5000/api/interviews/templates/${id}`, {
+      const response = await fetch(`${API_BASE}/${id}`, {
         method: 'DELETE'
       });
 
