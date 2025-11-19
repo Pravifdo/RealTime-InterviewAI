@@ -48,8 +48,8 @@ cd ../../frontend
 # Create production .env for frontend
 cat > .env.production << 'EOF'
 # This gets baked into the React build
-# Use the server's PUBLIC IP
-REACT_APP_BACKEND_URL=http://142.93.220.168:5000
+# Use the domain with HTTPS
+REACT_APP_BACKEND_URL=https://project.praveenruchira.me
 EOF
 
 echo "✅ Frontend .env.production created"
@@ -77,8 +77,8 @@ echo "✅ Deployment Complete!"
 echo "================================================"
 echo ""
 echo "📱 Access your app at:"
-echo "   Frontend: http://178.128.59.218:3000"
-echo "   Backend API: http://178.128.59.218:5000"
+echo "   Frontend: https://project.praveenruchira.me"
+echo "   Backend API: https://project.praveenruchira.me"
 echo ""
 echo "🔍 Useful commands:"
 echo "   pm2 list                    - View all processes"

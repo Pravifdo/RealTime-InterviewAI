@@ -2,7 +2,7 @@
 # CRITICAL REBUILD SCRIPT - Run this on your server at 142.93.220.168
 # This script properly rebuilds the frontend with the correct backend URL
 
-echo "🔧 FIXING FRONTEND BUILD - Server IP: 142.93.220.168"
+echo "🔧 FIXING FRONTEND BUILD - Domain: project.praveenruchira.me"
 echo "===================================================="
 
 # Stop frontend first
@@ -20,13 +20,13 @@ rm -rf node_modules/.cache
 # Create .env file (used during build)
 echo "📝 Creating .env file..."
 cat > .env << 'EOF'
-REACT_APP_BACKEND_URL=http://142.93.220.168:5000
+REACT_APP_BACKEND_URL=https://project.praveenruchira.me
 EOF
 
 # Create .env.production file (overrides .env for production build)
 echo "📝 Creating .env.production file..."
 cat > .env.production << 'EOF'
-REACT_APP_BACKEND_URL=http://142.93.220.168:5000
+REACT_APP_BACKEND_URL=https://project.praveenruchira.me
 EOF
 
 # Verify the files
@@ -47,22 +47,22 @@ npm install
 # Build with explicit environment variable
 echo ""
 echo "🔨 Building frontend (this takes 1-2 minutes)..."
-REACT_APP_BACKEND_URL=http://142.93.220.168:5000 npm run build
+REACT_APP_BACKEND_URL=https://project.praveenruchira.me npm run build
 
 # Check if build succeeded
 if [ -d "build" ]; then
     echo ""
     echo "✅ Build successful!"
     
-    # Search in the built files to verify the IP
+    # Search in the built files to verify the domain
     echo ""
-    echo "🔍 Verifying built files contain correct IP..."
-    if grep -r "142.93.220.168" build/ > /dev/null; then
-        echo "✅ Built files contain 142.93.220.168"
+    echo "🔍 Verifying built files contain correct domain..."
+    if grep -r "project.praveenruchira.me" build/ > /dev/null; then
+        echo "✅ Built files contain project.praveenruchira.me"
     else
-        echo "❌ WARNING: Built files do NOT contain 142.93.220.168"
-        echo "   Searching for what IP is in the build..."
-        grep -r "BACKEND_URL\|localhost:5000\|178.128.59.218" build/ | head -5
+        echo "❌ WARNING: Built files do NOT contain project.praveenruchira.me"
+        echo "   Searching for what URL is in the build..."
+        grep -r "BACKEND_URL\|localhost:5000\|142.93.220.168" build/ | head -5
     fi
     
     # Restart frontend
@@ -77,12 +77,12 @@ if [ -d "build" ]; then
     echo "===================================================="
     echo ""
     echo "📱 Access your app at:"
-    echo "   http://142.93.220.168:3000"
+    echo "   https://project.praveenruchira.me"
     echo ""
     echo "⚠️  IMPORTANT:"
-    echo "   1. Clear your browser cache (Ctrl+Shift+R)"
-    echo "   2. Or open in incognito/private window"
-    echo "   3. Check browser console - should NOT see localhost errors"
+    echo "   1. Make sure DNS is pointed to 142.93.220.168"
+    echo "   2. SSL certificate must be configured (nginx + Let's Encrypt)"
+    echo "   3. Clear browser cache (Ctrl+Shift+R)"
     echo ""
     pm2 list
 else
