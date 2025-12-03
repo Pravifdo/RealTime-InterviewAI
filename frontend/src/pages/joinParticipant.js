@@ -491,22 +491,56 @@ export default function JoinParticipant() {
           </div>
           
           <div className="answer-input-section">
+            {/* Speech Recognition Controls */}
+            {isSpeechSupported && (
+              <div className="speech-controls">
+                <button 
+                  className={`speech-button ${isListening ? 'listening' : ''}`}
+                  onClick={isListening ? stopListening : startListening}
+                >
+                  <FaMicrophone className="mic-icon" />
+                  {isListening ? 'Stop Speaking' : 'Start Speaking'}
+                  {isListening && <span className="listening-pulse"></span>}
+                </button>
+                {isListening && (
+                  <span className="listening-indicator">
+                    🎤 Listening...
+                  </span>
+                )}
+                {interimTranscript && (
+                  <div className="interim-text">
+                    <em>{interimTranscript}</em>
+                  </div>
+                )}
+              </div>
+            )}
+
             <textarea 
               value={answer} 
               onChange={e => setAnswer(e.target.value)} 
-              placeholder="Type your answer to the interviewer's questions here..."
+              placeholder="Type your answer or use voice input above..."
               className="answer-textarea"
               rows="4"
             />
             
-            <button 
-              className={`send-button ${answer.trim() ? 'active' : 'disabled'}`}
-              onClick={sendAnswer}
-              disabled={!answer.trim()}
-            >
-              <FaPaperPlane className="send-icon" />
-              Send Answer
-            </button>
+            <div className="button-group">
+              {transcript && (
+                <button 
+                  className="clear-button"
+                  onClick={resetTranscript}
+                >
+                  Clear Text
+                </button>
+              )}
+              <button 
+                className={`send-button ${answer.trim() ? 'active' : 'disabled'}`}
+                onClick={sendAnswer}
+                disabled={!answer.trim()}
+              >
+                <FaPaperPlane className="send-icon" />
+                Send Answer
+              </button>
+            </div>
           </div>
 
           {questions.length > 0 && (
@@ -868,6 +902,129 @@ export default function JoinParticipant() {
           gap: 16px;
         }
 
+        /* Speech Recognition Controls */
+        .speech-controls {
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
+          padding: 16px;
+          background: #f7fafc;
+          border-radius: 12px;
+          border: 2px dashed #cbd5e0;
+        }
+
+        .speech-button {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 10px;
+          padding: 14px 24px;
+          background: #667eea;
+          color: white;
+          border: none;
+          border-radius: 10px;
+          font-size: 16px;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.3s ease;
+          position: relative;
+        }
+
+        .speech-button:hover {
+          background: #5568d3;
+          transform: translateY(-2px);
+          box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .speech-button.listening {
+          background: #f56565;
+          animation: pulse 1.5s infinite;
+        }
+
+        .speech-button.listening:hover {
+          background: #e53e3e;
+        }
+
+        @keyframes pulse {
+          0%, 100% {
+            box-shadow: 0 0 0 0 rgba(245, 101, 101, 0.7);
+          }
+          50% {
+            box-shadow: 0 0 0 10px rgba(245, 101, 101, 0);
+          }
+        }
+
+        .mic-icon {
+          font-size: 20px;
+        }
+
+        .listening-pulse {
+          position: absolute;
+          right: 12px;
+          width: 8px;
+          height: 8px;
+          background: white;
+          border-radius: 50%;
+          animation: blink 1s infinite;
+        }
+
+        @keyframes blink {
+          0%, 50%, 100% { opacity: 1; }
+          25%, 75% { opacity: 0.3; }
+        }
+
+        .listening-indicator {
+          color: #f56565;
+          font-weight: 600;
+          font-size: 14px;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          animation: fadeInOut 2s infinite;
+        }
+
+        @keyframes fadeInOut {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.5; }
+        }
+
+        .interim-text {
+          padding: 12px;
+          background: white;
+          border-radius: 8px;
+          border-left: 4px solid #fbbf24;
+          font-size: 14px;
+          color: #78716c;
+          min-height: 40px;
+        }
+
+        .interim-text em {
+          font-style: normal;
+          color: #92400e;
+        }
+
+        .button-group {
+          display: flex;
+          gap: 12px;
+          justify-content: flex-end;
+        }
+
+        .clear-button {
+          padding: 12px 24px;
+          background: #e2e8f0;
+          color: #4a5568;
+          border: none;
+          border-radius: 8px;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.2s ease;
+        }
+
+        .clear-button:hover {
+          background: #cbd5e0;
+          transform: translateY(-2px);
+        }
+
         .answer-textarea {
           padding: 16px;
           border: 2px solid #e2e8f0;
@@ -888,9 +1045,31 @@ export default function JoinParticipant() {
           align-items: center;
           justify-content: center;
           gap: 8px;
-          padding: 16px;
+          padding: 14px 28px;
           border: none;
           border-radius: 12px;
+          font-size: 16px;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.3s ease;
+        }
+
+        .send-button.active {
+          background: #48bb78;
+          color: white;
+        }
+
+        .send-button.active:hover {
+          background: #38a169;
+          transform: translateY(-2px);
+          box-shadow: 0 6px 20px rgba(72, 187, 120, 0.4);
+        }
+
+        .send-button.disabled {
+          background: #e2e8f0;
+          color: #a0aec0;
+          cursor: not-allowed;
+        }
           font-weight: 600;
           font-size: 16px;
           cursor: pointer;

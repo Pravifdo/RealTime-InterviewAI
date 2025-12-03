@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { FaMicrophone, FaMicrophoneSlash, FaVideo, FaVideoSlash, FaPaperPlane, FaClock, FaUserTie, FaUserGraduate, FaPlay, FaStop, FaQuestionCircle, FaCopy } from "react-icons/fa";
 import { io } from "socket.io-client";
 import { useWebRTC } from "../hooks/useWebRTC";
+import { useSpeechRecognition } from "../hooks/useSpeechRecognition";
 import LoadTemplateByID from "../components/LoadTemplateByID";
 import LiveEvaluationPanel from "../components/LiveEvaluationPanel";
 
@@ -37,6 +38,24 @@ export default function JoinInterview() {
 
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
+
+  // Speech recognition hook for interviewer
+  const {
+    isListening,
+    transcript,
+    interimTranscript,
+    isSupported: isSpeechSupported,
+    startListening,
+    stopListening,
+    resetTranscript
+  } = useSpeechRecognition();
+
+  // Update question when speech transcript changes
+  useEffect(() => {
+    if (transcript) {
+      setQuestion(transcript);
+    }
+  }, [transcript]);
 
   // Generate Room ID on mount
   useEffect(() => {
@@ -394,22 +413,56 @@ export default function JoinInterview() {
         </div>
         
         <div className="question-input-section">
+          {/* Speech Recognition Controls */}
+          {isSpeechSupported && (
+            <div className="speech-controls">
+              <button 
+                className={`speech-button ${isListening ? 'listening' : ''}`}
+                onClick={isListening ? stopListening : startListening}
+              >
+                <FaMicrophone className="mic-icon" />
+                {isListening ? 'Stop Speaking' : 'Start Speaking'}
+                {isListening && <span className="listening-pulse"></span>}
+              </button>
+              {isListening && (
+                <span className="listening-indicator">
+                  🎤 Listening...
+                </span>
+              )}
+              {interimTranscript && (
+                <div className="interim-text">
+                  <em>{interimTranscript}</em>
+                </div>
+              )}
+            </div>
+          )}
+
           <textarea 
             value={question} 
             onChange={e => setQuestion(e.target.value)} 
-            placeholder="Type your question for the participant here..."
+            placeholder="Type your question or use voice input above..."
             className="question-textarea"
             rows="4"
           />
           
-          <button 
-            className={`send-button ${question.trim() ? 'active' : 'disabled'}`}
-            onClick={sendQuestion}
-            disabled={!question.trim()}
-          >
-            <FaPaperPlane className="send-icon" />
-            Send Question
-          </button>
+          <div className="button-group">
+            {transcript && (
+              <button 
+                className="clear-button"
+                onClick={resetTranscript}
+              >
+                Clear Text
+              </button>
+            )}
+            <button 
+              className={`send-button ${question.trim() ? 'active' : 'disabled'}`}
+              onClick={sendQuestion}
+              disabled={!question.trim()}
+            >
+              <FaPaperPlane className="send-icon" />
+              Send Question
+            </button>
+          </div>
         </div>
 
         {!meetingStarted && (
@@ -798,6 +851,129 @@ export default function JoinInterview() {
           gap: 16px;
         }
 
+        /* Speech Recognition Controls */
+        .speech-controls {
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
+          padding: 16px;
+          background: #fff5f5;
+          border-radius: 12px;
+          border: 2px dashed #feb2b2;
+        }
+
+        .speech-button {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 10px;
+          padding: 14px 24px;
+          background: #e44d26;
+          color: white;
+          border: none;
+          border-radius: 10px;
+          font-size: 16px;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.3s ease;
+          position: relative;
+        }
+
+        .speech-button:hover {
+          background: #c93d1f;
+          transform: translateY(-2px);
+          box-shadow: 0 6px 20px rgba(228, 77, 38, 0.4);
+        }
+
+        .speech-button.listening {
+          background: #f56565;
+          animation: pulse 1.5s infinite;
+        }
+
+        .speech-button.listening:hover {
+          background: #e53e3e;
+        }
+
+        @keyframes pulse {
+          0%, 100% {
+            box-shadow: 0 0 0 0 rgba(245, 101, 101, 0.7);
+          }
+          50% {
+            box-shadow: 0 0 0 10px rgba(245, 101, 101, 0);
+          }
+        }
+
+        .mic-icon {
+          font-size: 20px;
+        }
+
+        .listening-pulse {
+          position: absolute;
+          right: 12px;
+          width: 8px;
+          height: 8px;
+          background: white;
+          border-radius: 50%;
+          animation: blink 1s infinite;
+        }
+
+        @keyframes blink {
+          0%, 50%, 100% { opacity: 1; }
+          25%, 75% { opacity: 0.3; }
+        }
+
+        .listening-indicator {
+          color: #f56565;
+          font-weight: 600;
+          font-size: 14px;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          animation: fadeInOut 2s infinite;
+        }
+
+        @keyframes fadeInOut {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.5; }
+        }
+
+        .interim-text {
+          padding: 12px;
+          background: white;
+          border-radius: 8px;
+          border-left: 4px solid #fbbf24;
+          font-size: 14px;
+          color: #78716c;
+          min-height: 40px;
+        }
+
+        .interim-text em {
+          font-style: normal;
+          color: #92400e;
+        }
+
+        .button-group {
+          display: flex;
+          gap: 12px;
+          justify-content: flex-end;
+        }
+
+        .clear-button {
+          padding: 12px 24px;
+          background: #e2e8f0;
+          color: #4a5568;
+          border: none;
+          border-radius: 8px;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.2s ease;
+        }
+
+        .clear-button:hover {
+          background: #cbd5e0;
+          transform: translateY(-2px);
+        }
+
         .question-textarea {
           padding: 16px;
           border: 2px solid #e2e8f0;
@@ -818,13 +994,13 @@ export default function JoinInterview() {
           align-items: center;
           justify-content: center;
           gap: 8px;
-          padding: 16px;
+          padding: 14px 28px;
           border: none;
           border-radius: 12px;
           font-weight: 600;
           font-size: 16px;
           cursor: pointer;
-          transition: all 0.2s ease;
+          transition: all 0.3s ease;
         }
 
         .send-button.active {
@@ -832,9 +1008,17 @@ export default function JoinInterview() {
           color: white;
         }
 
+        .send-button.active:hover {
+          background: #c93d1f;
+          transform: translateY(-2px);
+          box-shadow: 0 6px 20px rgba(228, 77, 38, 0.4);
+        }
+
         .send-button.disabled {
           background: #e2e8f0;
           color: #a0aec0;
+          cursor: not-allowed;
+        }
           cursor: not-allowed;
         }
 
