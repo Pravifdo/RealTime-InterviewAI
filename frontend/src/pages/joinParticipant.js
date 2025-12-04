@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
-import { FaMicrophone, FaMicrophoneSlash, FaVideo, FaVideoSlash, FaPaperPlane, FaClock, FaUserGraduate, FaUserTie, FaQuestionCircle, FaComment, FaSignInAlt } from "react-icons/fa";
+import { useNavigate } from "react-router-dom";
+import { FaMicrophone, FaMicrophoneSlash, FaVideo, FaVideoSlash, FaPaperPlane, FaClock, FaUserGraduate, FaUserTie, FaQuestionCircle, FaComment, FaSignInAlt, FaSignOutAlt } from "react-icons/fa";
 import { io } from "socket.io-client";
 import { useWebRTC } from "../hooks/useWebRTC";
 import { useSpeechRecognition } from "../hooks/useSpeechRecognition";
@@ -16,6 +17,7 @@ const socket = io(BACKEND_URL, {
 });
 
 export default function JoinParticipant() {
+  const navigate = useNavigate();
   const [micOn, setMicOn] = useState(true);
   const [camOn, setCamOn] = useState(true);
   const [time, setTime] = useState(0);
@@ -28,6 +30,7 @@ export default function JoinParticipant() {
   const [roomID, setRoomID] = useState('');
   const [roomIDInput, setRoomIDInput] = useState('');
   const [isJoined, setIsJoined] = useState(false);
+  const [meetingStarted, setMeetingStarted] = useState(false);
 
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
@@ -106,9 +109,18 @@ export default function JoinParticipant() {
   useEffect(() => {
     socket.on("update-interviewer", setInterviewerState);
     socket.on("meeting-status", data => setTime(data.time));
-    socket.on("meeting-ended", () => {
-      alert("Interview ended by interviewer");
+    socket.on("meeting-started", () => {
+      setMeetingStarted(true);
       setTime(0);
+    });
+    socket.on("meeting-ended", () => {
+      setMeetingStarted(false);
+      setTime(0);
+      cleanup();
+      alert("Interview ended by interviewer. Redirecting to dashboard...");
+      setTimeout(() => {
+        navigate('/participant');
+      }, 1500);
     });
 
     // Listen for questions asked during interview (new flow)
@@ -147,9 +159,23 @@ export default function JoinParticipant() {
       socket.off("receive-question");
       socket.off("answer-submitted");
       socket.off("meeting-status");
+      socket.off("meeting-started");
       socket.off("meeting-ended");
     };
   }, [resetTranscript]);
+
+  // Local timer for participant - counts every second when meeting is active
+  useEffect(() => {
+    let interval;
+    if (meetingStarted) {
+      interval = setInterval(() => {
+        setTime(prevTime => prevTime + 1);
+      }, 1000);
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [meetingStarted]);
 
   const toggleMic = () => {
     const newMicState = !micOn;
@@ -189,6 +215,13 @@ export default function JoinParticipant() {
     setRoomID(roomIDInput.trim());
     setIsJoined(true);
     console.log('🔗 Attempting to join room:', roomIDInput.trim());
+  };
+
+  const leaveMeeting = () => {
+    if (window.confirm('Are you sure you want to leave the interview?')) {
+      cleanup();
+      navigate('/participant');
+    }
   };
 
   const formatTime = s => `${Math.floor(s/60).toString().padStart(2,'0')}:${(s%60).toString().padStart(2,'0')}`;
@@ -342,6 +375,10 @@ export default function JoinParticipant() {
             <FaClock className="timer-icon" />
             <span>{formatTime(time)}</span>
           </div>
+          <button className="leave-meeting-btn" onClick={leaveMeeting}>
+            <FaSignOutAlt className="btn-icon" />
+            Leave Interview
+          </button>
         </div>
       </div>
 
@@ -622,6 +659,7 @@ export default function JoinParticipant() {
         .timer-section {
           display: flex;
           align-items: center;
+          gap: 16px;
         }
 
         .timer {
@@ -638,6 +676,31 @@ export default function JoinParticipant() {
 
         .timer-icon {
           color: #ffd700;
+        }
+
+        .leave-meeting-btn {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          padding: 12px 20px;
+          background: #718096;
+          color: white;
+          border: none;
+          border-radius: 12px;
+          font-size: 16px;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.3s ease;
+        }
+
+        .leave-meeting-btn:hover {
+          background: #4a5568;
+          transform: translateY(-2px);
+          box-shadow: 0 4px 12px rgba(113, 128, 150, 0.3);
+        }
+
+        .btn-icon {
+          font-size: 14px;
         }
 
         /* Error Alert */

@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useRef } from "react";
-import { FaMicrophone, FaMicrophoneSlash, FaVideo, FaVideoSlash, FaPaperPlane, FaClock, FaUserTie, FaUserGraduate, FaPlay, FaStop, FaQuestionCircle, FaCopy } from "react-icons/fa";
+import { useNavigate } from "react-router-dom";
+import { FaMicrophone, FaMicrophoneSlash, FaVideo, FaVideoSlash, FaPaperPlane, FaClock, FaUserTie, FaUserGraduate, FaPlay, FaStop, FaQuestionCircle, FaCopy, FaSignOutAlt } from "react-icons/fa";
 import { io } from "socket.io-client";
 import { useWebRTC } from "../hooks/useWebRTC";
 import { useSpeechRecognition } from "../hooks/useSpeechRecognition";
 import LoadTemplateByID from "../components/LoadTemplateByID";
 import LiveEvaluationPanel from "../components/LiveEvaluationPanel";
+
 
 // Use environment variable or fallback to localhost
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || "http://localhost:5000";
@@ -24,6 +26,7 @@ const generateRoomID = () => {
 };
 
 export default function JoinInterview() {
+  const navigate = useNavigate();
   const [micOn, setMicOn] = useState(true);
   const [camOn, setCamOn] = useState(true);
   const [time, setTime] = useState(0);
@@ -118,11 +121,16 @@ export default function JoinInterview() {
     socket.on("meeting-status", data => setTime(data.time));
     socket.on("meeting-started", () => {
       setMeetingStarted(true);
+      setTime(0);
     });
     socket.on("meeting-ended", () => {
-      alert("Interview ended");
       setMeetingStarted(false);
       setTime(0);
+      cleanup();
+      alert("Interview ended");
+      setTimeout(() => {
+        navigate('/interviewer');
+      }, 500);
     });
 
     return () => {
@@ -132,6 +140,19 @@ export default function JoinInterview() {
       socket.off("meeting-ended");
     };
   }, []);
+
+  // Local timer for real-time updates
+  useEffect(() => {
+    let interval;
+    if (meetingStarted) {
+      interval = setInterval(() => {
+        setTime(prevTime => prevTime + 1);
+      }, 1000);
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [meetingStarted]);
 
   const toggleMic = () => {
     const newMicState = !micOn;
@@ -154,11 +175,26 @@ export default function JoinInterview() {
   };
 
   const startMeeting = () => {
+    setMeetingStarted(true);
+    setTime(0);
     socket.emit("start-meeting");
   };
 
   const endMeeting = () => {
-    socket.emit("end-meeting");
+    if (window.confirm('Are you sure you want to end the interview?')) {
+      setMeetingStarted(false);
+      setTime(0);
+      socket.emit("end-meeting");
+      cleanup();
+      setTimeout(() => {
+        navigate('/interviewer');
+      }, 1000);
+    }
+  };
+
+  const leaveMeeting = () => {
+    cleanup();
+    navigate('/interviewer');
   };
 
   const copyRoomID = () => {
@@ -277,10 +313,16 @@ export default function JoinInterview() {
                 Start Interview
               </button>
             ) : (
-              <button className="end-meeting-btn" onClick={endMeeting}>
-                <FaStop className="btn-icon" />
-                End Interview
-              </button>
+              <>
+                <button className="end-meeting-btn" onClick={endMeeting}>
+                  <FaStop className="btn-icon" />
+                  End Interview
+                </button>
+                <button className="leave-meeting-btn" onClick={leaveMeeting}>
+                  <FaSignOutAlt className="btn-icon" />
+                  Leave
+                </button>
+              </>
             )}
           </div>
         </div>
@@ -632,6 +674,17 @@ export default function JoinInterview() {
           background: #c53030;
           transform: translateY(-2px);
           box-shadow: 0 4px 12px rgba(229, 62, 62, 0.3);
+        }
+
+        .leave-meeting-btn {
+          background: #718096;
+          color: white;
+        }
+
+        .leave-meeting-btn:hover {
+          background: #4a5568;
+          transform: translateY(-2px);
+          box-shadow: 0 4px 12px rgba(113, 128, 150, 0.3);
         }
 
         .btn-icon {

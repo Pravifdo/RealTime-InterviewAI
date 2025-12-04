@@ -1,9 +1,14 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import axios from "axios";
 import "../styles/ParticipantDashboard.css";
+
+const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:5000';
 
 function ParticipantDashboard() {
   const [activePage, setActivePage] = useState("overview");
+  const [evaluations, setEvaluations] = useState([]);
+  const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
   // Route protection: redirect if not logged in
@@ -13,6 +18,28 @@ function ParticipantDashboard() {
       navigate("/login");
     }
   }, [navigate]);
+
+  // Fetch evaluations data
+  useEffect(() => {
+    fetchEvaluations();
+  }, []);
+
+  const fetchEvaluations = async () => {
+    try {
+      setLoading(true);
+      const token = localStorage.getItem("token");
+      const response = await axios.get(`${BACKEND_URL}/api/evaluation/my-evaluations`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (response.data.success) {
+        setEvaluations(response.data.data || []);
+      }
+      setLoading(false);
+    } catch (error) {
+      console.error('Error fetching evaluations:', error);
+      setLoading(false);
+    }
+  };
 
   // Logout handler
   const handleLogout = () => {
@@ -60,17 +87,80 @@ function ParticipantDashboard() {
       <div className="main-content">
         {activePage === "overview" && (
           <div>
-            <h1>Dashboard Overview</h1>
-            <div className="card-container">
-              <div className="card">
-                <h3>Final Average Score</h3>
-                <p className="card-value">85%</p>
-              </div>
-              <div className="card">
-                <h3>Hours Practiced</h3>
-                <p className="card-value">120 hrs</p>
-              </div>
-            </div>
+            <h1>Your Performance Overview</h1>
+            {loading ? (
+              <p>Loading your data...</p>
+            ) : (
+              <>
+                <div className="card-container">
+                  <div className="card">
+                    <h3>Interviews Completed</h3>
+                    <p className="card-value">{evaluations.filter(e => e.status === 'completed').length}</p>
+                  </div>
+                  <div className="card">
+                    <h3>Average Score</h3>
+                    <p className="card-value">
+                      {evaluations.length > 0
+                        ? (evaluations.reduce((sum, e) => sum + (e.averageScore || 0), 0) / evaluations.length).toFixed(1)
+                        : 0}%
+                    </p>
+                  </div>
+                  <div className="card">
+                    <h3>Total Questions Answered</h3>
+                    <p className="card-value">
+                      {evaluations.reduce((sum, e) => sum + (e.totalQuestions || 0), 0)}
+                    </p>
+                  </div>
+                </div>
+
+                {evaluations.length > 0 && (
+                  <div className="interview-history">
+                    <h2>Your Interview History</h2>
+                    <div className="history-list">
+                      {evaluations.map((evaluation, index) => (
+                        <div key={index} className="history-item">
+                          <div className="history-header">
+                            <h4>Room: {evaluation.roomId}</h4>
+                            <span className={`status ${evaluation.status}`}>{evaluation.status}</span>
+                          </div>
+                          <div className="history-body">
+                            <div className="history-stat">
+                              <span className="stat-label">Score:</span>
+                              <span className="stat-value" style={{
+                                color: evaluation.averageScore >= 70 ? '#48bb78' : 
+                                       evaluation.averageScore >= 50 ? '#fbbf24' : '#f56565'
+                              }}>
+                                {(evaluation.averageScore || 0).toFixed(1)}%
+                              </span>
+                            </div>
+                            <div className="history-stat">
+                              <span className="stat-label">Questions:</span>
+                              <span className="stat-value">{evaluation.totalQuestions || 0}</span>
+                            </div>
+                            <div className="history-stat">
+                              <span className="stat-label">Answered:</span>
+                              <span className="stat-value">{evaluation.questionsAnswered || 0}</span>
+                            </div>
+                          </div>
+                          {evaluation.questionsAnswers && evaluation.questionsAnswers.length > 0 && (
+                            <div className="ai-feedback-summary">
+                              <h5>Latest Feedback:</h5>
+                              <p>{evaluation.questionsAnswers[evaluation.questionsAnswers.length - 1].aiFeedback || 'No feedback available'}</p>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {evaluations.length === 0 && (
+                  <div className="no-data">
+                    <p>You haven't completed any interviews yet. Start your first interview to see your performance data!</p>
+                  </div>
+                )}
+              </>
+            )}
           </div>
         )}
 

@@ -1,9 +1,14 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import axios from "axios";
 import "../styles/InterviewerDashboard.css";
+
+const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:5000';
 
 function InterviewerDashboard() {
   const [activePage, setActivePage] = useState("overview");
+  const [evaluations, setEvaluations] = useState([]);
+  const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
   // Route protection: redirect if not logged in
@@ -13,6 +18,25 @@ function InterviewerDashboard() {
       navigate("/login");
     }
   }, [navigate]);
+
+  // Fetch evaluations data
+  useEffect(() => {
+    fetchEvaluations();
+  }, []);
+
+  const fetchEvaluations = async () => {
+    try {
+      setLoading(true);
+      const response = await axios.get(`${BACKEND_URL}/api/evaluation`);
+      if (response.data.success) {
+        setEvaluations(response.data.data || []);
+      }
+      setLoading(false);
+    } catch (error) {
+      console.error('Error fetching evaluations:', error);
+      setLoading(false);
+    }
+  };
 
   // Logout handler
   const handleLogout = () => {
@@ -64,16 +88,56 @@ function InterviewerDashboard() {
         {activePage === "overview" && (
           <div>
             <h1>Dashboard Overview</h1>
-            <div className="card-container">
-              <div className="card">
-                <h3>Total Interviews Conducted</h3>
-                <p className="card-value">15</p>
-              </div>
-              <div className="card">
-                <h3>Participants Rated</h3>
-                <p className="card-value">12</p>
-              </div>
-            </div>
+            {loading ? (
+              <p>Loading data...</p>
+            ) : (
+              <>
+                <div className="card-container">
+                  <div className="card">
+                    <h3>Total Interviews Conducted</h3>
+                    <p className="card-value">{evaluations.length}</p>
+                  </div>
+                  <div className="card">
+                    <h3>Completed Interviews</h3>
+                    <p className="card-value">{evaluations.filter(e => e.status === 'completed').length}</p>
+                  </div>
+                  <div className="card">
+                    <h3>Average Score</h3>
+                    <p className="card-value">
+                      {evaluations.length > 0 
+                        ? (evaluations.reduce((sum, e) => sum + (e.averageScore || 0), 0) / evaluations.length).toFixed(1)
+                        : 0}%
+                    </p>
+                  </div>
+                </div>
+                
+                {evaluations.length > 0 && (
+                  <div className="recent-interviews">
+                    <h2>Recent Interviews</h2>
+                    <div className="interview-list">
+                      {evaluations.slice(0, 5).map((evaluation, index) => (
+                        <div key={index} className="interview-item">
+                          <div className="interview-info">
+                            <h4>{evaluation.participantName || 'Anonymous'}</h4>
+                            <p>Room: {evaluation.roomId}</p>
+                            <p>Questions: {evaluation.totalQuestions || 0}</p>
+                            <p>Status: <span className={`status ${evaluation.status}`}>{evaluation.status}</span></p>
+                          </div>
+                          <div className="interview-score">
+                            <div className="score-circle" style={{
+                              background: evaluation.averageScore >= 70 ? '#48bb78' : 
+                                         evaluation.averageScore >= 50 ? '#fbbf24' : '#f56565'
+                            }}>
+                              {(evaluation.averageScore || 0).toFixed(0)}%
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
           </div>
         )}
 
