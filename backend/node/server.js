@@ -200,10 +200,18 @@ io.on("connection", (socket) => {
  socket.on('new-question', async (data) => {
    console.log("New question:", data);
    
-   // data can be {question: string, keywords: []} or just a string
-   const questionData = typeof data === 'string' 
-     ? { question: data, keywords: [] }
-     : data;
+   // Extract roomId from data
+   let roomId = null;
+   let questionData;
+   
+   // data can be {question: string, roomId: string, keywords: []} or just a string
+   if (typeof data === 'string') {
+     questionData = { question: data, keywords: [] };
+     roomId = socket.roomId || Object.keys(socket.rooms).find(r => r.startsWith('room-'));
+   } else {
+     questionData = data;
+     roomId = data.roomId || socket.roomId || Object.keys(socket.rooms).find(r => r.startsWith('room-'));
+   }
    
    // Auto-extract keywords if not provided
    if (!questionData.keywords || questionData.keywords.length === 0) {
@@ -211,6 +219,41 @@ io.on("connection", (socket) => {
    }
    
    console.log("Question keywords:", questionData.keywords);
+   console.log("Room ID:", roomId);
+   
+   // Save to InterviewTemplate for answer evaluation
+   if (roomId) {
+     try {
+       let template = await InterviewTemplate.findOne({ roomId });
+       
+       if (!template) {
+         template = new InterviewTemplate({
+           roomId,
+           title: 'Live Interview',
+           questions: [],
+           status: 'in-progress'
+         });
+       }
+       
+       // Add question to template
+       const questionIndex = template.questions.length;
+       template.questions.push({
+         question: questionData.question,
+         expectedKeywords: questionData.keywords || [],
+         category: 'General',
+         difficulty: 'Medium',
+         order: questionIndex
+       });
+       
+       await template.save();
+       console.log(`✅ Question saved to template (Q${questionIndex + 1}) for room: ${roomId}`);
+     } catch (error) {
+       console.error("Error saving question to template:", error);
+     }
+   } else {
+     console.warn("⚠️ No roomId found, question not saved to template");
+   }
+   
    io.emit('new-question', questionData);
  });
 
@@ -297,6 +340,7 @@ io.on("connection", (socket) => {
    const { question, keywords, roomId, questionIndex } = data;
    
    try {
+     // Save to Evaluation session
      let session = await Evaluation.findOne({ roomId, status: 'ongoing' });
      
      if (!session) {
@@ -307,7 +351,7 @@ io.on("connection", (socket) => {
        });
      }
      
-     // Add or update question
+     // Add or update question in evaluation
      if (session.questionsAnswers[questionIndex]) {
        session.questionsAnswers[questionIndex].question = question;
        session.questionsAnswers[questionIndex].expectedKeywords = keywords;
@@ -321,7 +365,36 @@ io.on("connection", (socket) => {
      }
      
      await session.save();
-     console.log("Question saved with keywords");
+     
+     // ALSO save to InterviewTemplate for answer evaluation
+     let template = await InterviewTemplate.findOne({ roomId });
+     
+     if (!template) {
+       template = new InterviewTemplate({
+         roomId,
+         title: 'Ad-hoc Interview',
+         questions: [],
+         status: 'in-progress'
+       });
+     }
+     
+     // Add or update question in template
+     if (template.questions[questionIndex]) {
+       template.questions[questionIndex].question = question;
+       template.questions[questionIndex].expectedKeywords = keywords || [];
+     } else {
+       template.questions.push({
+         question,
+         expectedKeywords: keywords || [],
+         category: 'General',
+         difficulty: 'Medium',
+         order: questionIndex
+       });
+     }
+     
+     await template.save();
+     console.log(`✅ Question saved to both Evaluation and Template (Q${questionIndex + 1})`);
+     
    } catch (error) {
      console.error("Error saving question:", error);
    }
@@ -465,14 +538,8 @@ io.on("connection", (socket) => {
        io.to(roomId).emit('receive-question', {
          questionIndex,
          question: question.question,
-         totalQuestions: template.questions.length
-       });
-       
-       // Send to interviewer for tracking (without keywords for security)
-       socket.emit('question-sent', {
-         questionIndex,
-         question: question.question,
-         timestamp: new Date()
+         totalQuestions: template.questions.length,
+         templateId: templateId || template._id.toString()
        });
        
      } else {
@@ -492,16 +559,33 @@ io.on("connection", (socket) => {
  socket.on('submit-answer', async (data) => {
    const { roomId, questionIndex, answer, templateId } = data;
    
+   console.log('📥 Answer submission received:', {
+     roomId,
+     questionIndex,
+     templateId,
+     hasAnswer: !!answer
+   });
+   
    try {
      // Try to find by templateId first, then fall back to roomId
      let template;
      if (templateId) {
+       console.log(`🔍 Looking up template by ID: ${templateId}`);
        template = await InterviewTemplate.findById(templateId);
-     } else {
+     }
+     
+     if (!template) {
+       console.log(`🔍 Template not found by ID, trying roomId: ${roomId}`);
        template = await InterviewTemplate.findOne({ roomId });
      }
      
-     if (!template || !template.questions[questionIndex]) {
+     if (!template) {
+       console.error(`❌ No template found for templateId: ${templateId}, roomId: ${roomId}`);
+       throw new Error('Question template not found');
+     }
+     
+     if (!template.questions[questionIndex]) {
+       console.error(`❌ Question index ${questionIndex} not found in template (has ${template.questions.length} questions)`);
        throw new Error('Question template not found');
      }
      
@@ -568,6 +652,7 @@ io.on("connection", (socket) => {
      // Broadcast AI evaluation results to interviewer
      io.to(roomId).emit('answer-evaluated', {
        questionIndex,
+       answer: answer,
        score: evaluation.score,
        feedback: evaluation.feedback,
        strengths: evaluation.strengths,

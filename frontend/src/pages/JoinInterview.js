@@ -38,9 +38,12 @@ export default function JoinInterview() {
   const [setupComplete, setSetupComplete] = useState(false);
   const [savedQuestions, setSavedQuestions] = useState([]);
   const [templateId, setTemplateId] = useState(null);
+  const [questionsAsked, setQuestionsAsked] = useState([]);
+  const [participantAnswers, setParticipantAnswers] = useState([]);
 
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
+  const answersEndRef = useRef(null);
 
   // Speech recognition hook for interviewer
   const {
@@ -133,11 +136,34 @@ export default function JoinInterview() {
       }, 500);
     });
 
+    // Listen for participant answers
+    socket.on("answer-submitted", (data) => {
+      if (data.success) {
+        console.log('✅ Participant submitted answer for Q' + (data.questionIndex + 1));
+      }
+    });
+
+    socket.on("answer-evaluated", (data) => {
+      console.log('📊 Answer evaluated:', data);
+      setParticipantAnswers(prev => {
+        const updated = [...prev];
+        updated[data.questionIndex] = {
+          answer: data.answer || 'No answer provided',
+          score: data.score,
+          feedback: data.feedback,
+          questionIndex: data.questionIndex
+        };
+        return updated;
+      });
+    });
+
     return () => {
       socket.off("update-participant");
       socket.off("meeting-status");
       socket.off("meeting-started");
       socket.off("meeting-ended");
+      socket.off("answer-submitted");
+      socket.off("answer-evaluated");
     };
   }, []);
 
@@ -153,6 +179,11 @@ export default function JoinInterview() {
       if (interval) clearInterval(interval);
     };
   }, [meetingStarted]);
+
+  // Auto-scroll to latest answer
+  useEffect(() => {
+    answersEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [participantAnswers]);
 
   const toggleMic = () => {
     const newMicState = !micOn;
@@ -170,8 +201,22 @@ export default function JoinInterview() {
 
   const sendQuestion = () => {
     if (!question.trim()) return;
-    socket.emit("new-question", question);
+    
+    // Add question to local state
+    setQuestionsAsked(prev => [...prev, {
+      question: question,
+      timestamp: new Date(),
+      index: prev.length
+    }]);
+    
+    // Send question with roomId
+    socket.emit("new-question", {
+      question: question,
+      roomId: roomID
+    });
+    
     setQuestion("");
+    console.log('📤 Question sent to participant in room:', roomID);
   };
 
   const startMeeting = () => {
@@ -512,6 +557,66 @@ export default function JoinInterview() {
             💡 Start the meeting to begin the interview session
           </div>
         )}
+      </div>
+
+      {/* Questions & Answers Display */}
+      <div className="content-card qa-display-panel">
+        <div className="card-header">
+          <FaQuestionCircle className="card-icon" />
+          <h3>Interview Questions & Answers</h3>
+          <span className="qa-count">{questionsAsked.length} Questions Asked</span>
+        </div>
+        
+        <div className="qa-list">
+          {questionsAsked.length === 0 ? (
+            <div className="empty-qa">
+              <p>📝 No questions asked yet</p>
+              <span>Send questions to the participant to start the interview</span>
+            </div>
+          ) : (
+            questionsAsked.map((q, index) => (
+              <div key={index} className="qa-item">
+                <div className="question-section">
+                  <div className="qa-label">
+                    <span className="q-badge">Q{index + 1}</span>
+                    <span className="timestamp">
+                      {q.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                  </div>
+                  <div className="question-text">{q.question}</div>
+                </div>
+                
+                {participantAnswers[index] ? (
+                  <div className="answer-section">
+                    <div className="answer-label">
+                      <span className="a-badge">Answer</span>
+                      {participantAnswers[index].score !== undefined && (
+                        <span className="score-badge" style={{
+                          background: participantAnswers[index].score >= 70 ? '#48bb78' : 
+                                      participantAnswers[index].score >= 50 ? '#ed8936' : '#f56565'
+                        }}>
+                          Score: {participantAnswers[index].score}%
+                        </span>
+                      )}
+                    </div>
+                    <div className="answer-text">{participantAnswers[index].answer}</div>
+                    {participantAnswers[index].feedback && (
+                      <div className="ai-feedback-box">
+                        <strong>AI Feedback:</strong>
+                        <p>{participantAnswers[index].feedback}</p>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="waiting-answer">
+                    <span className="waiting-text">⏳ Waiting for participant's answer...</span>
+                  </div>
+                )}
+              </div>
+            ))
+          )}
+          <div ref={answersEndRef} />
+        </div>
       </div>
 
       {/* Load Template or Live Evaluation Panel */}
@@ -1090,6 +1195,181 @@ export default function JoinInterview() {
           color: #856404;
           font-size: 14px;
           text-align: center;
+        }
+
+        /* Questions & Answers Display Panel */
+        .qa-display-panel {
+          margin-top: 20px;
+        }
+
+        .qa-count {
+          background: #e44d26;
+          color: white;
+          padding: 6px 12px;
+          border-radius: 20px;
+          font-size: 12px;
+          font-weight: 600;
+        }
+
+        .qa-list {
+          max-height: 600px;
+          overflow-y: auto;
+          padding: 16px;
+          background: #f7fafc;
+          border-radius: 12px;
+        }
+
+        .empty-qa {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          padding: 40px 20px;
+          color: #a0aec0;
+          text-align: center;
+        }
+
+        .empty-qa p {
+          font-size: 18px;
+          font-weight: 600;
+          margin: 0 0 8px 0;
+        }
+
+        .empty-qa span {
+          font-size: 14px;
+        }
+
+        .qa-item {
+          background: white;
+          border-radius: 12px;
+          padding: 20px;
+          margin-bottom: 16px;
+          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+          animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+          from {
+            opacity: 0;
+            transform: translateY(10px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+
+        .question-section {
+          margin-bottom: 16px;
+        }
+
+        .qa-label {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          margin-bottom: 8px;
+        }
+
+        .q-badge {
+          background: #e44d26;
+          color: white;
+          padding: 6px 12px;
+          border-radius: 6px;
+          font-weight: 700;
+          font-size: 12px;
+        }
+
+        .timestamp {
+          color: #718096;
+          font-size: 12px;
+        }
+
+        .question-text {
+          padding: 12px;
+          background: #fef5f1;
+          border-left: 4px solid #e44d26;
+          border-radius: 8px;
+          color: #2d3748;
+          font-size: 15px;
+          line-height: 1.6;
+          font-weight: 500;
+        }
+
+        .answer-section {
+          padding-top: 16px;
+          border-top: 2px solid #e2e8f0;
+        }
+
+        .answer-label {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          margin-bottom: 8px;
+        }
+
+        .a-badge {
+          background: #48bb78;
+          color: white;
+          padding: 6px 12px;
+          border-radius: 6px;
+          font-weight: 700;
+          font-size: 12px;
+        }
+
+        .score-badge {
+          color: white;
+          padding: 6px 12px;
+          border-radius: 6px;
+          font-weight: 600;
+          font-size: 12px;
+        }
+
+        .answer-text {
+          padding: 12px;
+          background: #f0fff4;
+          border-left: 4px solid #48bb78;
+          border-radius: 8px;
+          color: #2d3748;
+          font-size: 14px;
+          line-height: 1.6;
+          white-space: pre-wrap;
+          word-wrap: break-word;
+        }
+
+        .ai-feedback-box {
+          margin-top: 12px;
+          padding: 12px;
+          background: #ebf8ff;
+          border-left: 4px solid #4299e1;
+          border-radius: 8px;
+        }
+
+        .ai-feedback-box strong {
+          color: #2c5282;
+          display: block;
+          margin-bottom: 6px;
+          font-size: 13px;
+        }
+
+        .ai-feedback-box p {
+          margin: 0;
+          color: #2d3748;
+          font-size: 13px;
+          line-height: 1.5;
+        }
+
+        .waiting-answer {
+          padding: 20px;
+          background: #fefcbf;
+          border: 2px dashed #f6e05e;
+          border-radius: 8px;
+          text-align: center;
+        }
+
+        .waiting-text {
+          color: #744210;
+          font-size: 14px;
+          font-weight: 600;
         }
 
         /* Responsive Design */

@@ -167,7 +167,7 @@ export default function EvaluationPanel({ socket, roomID }) {
               <div className="qa-header">
                 <span className="qa-number">Q{index + 1}</span>
                 <span className="qa-keywords">
-                  Keywords: {q.keywords.length > 0 ? q.keywords.join(', ') : 'Auto-extracted'}
+                  Keywords: {Array.isArray(q.keywords) && q.keywords.length > 0 ? q.keywords.join(', ') : 'Auto-extracted'}
                 </span>
               </div>
               <div className="qa-text">{q.question}</div>
@@ -183,7 +183,7 @@ export default function EvaluationPanel({ socket, roomID }) {
                 </div>
                 <div className="qa-text">{answers[index].answer}</div>
                 
-                {answers[index].matchedKeywords && answers[index].matchedKeywords.length > 0 && (
+                {Array.isArray(answers[index].matchedKeywords) && answers[index].matchedKeywords.length > 0 && (
                   <div className="keyword-match">
                     <span className="match-label">✅ Matched Keywords:</span>
                     <span className="matched-keywords">
@@ -192,7 +192,7 @@ export default function EvaluationPanel({ socket, roomID }) {
                   </div>
                 )}
                 
-                {answers[index].participantKeywords && (
+                {Array.isArray(answers[index].participantKeywords) && answers[index].participantKeywords.length > 0 && (
                   <div className="keyword-match">
                     <span className="match-label">🔑 Participant Keywords:</span>
                     <span className="participant-keywords">

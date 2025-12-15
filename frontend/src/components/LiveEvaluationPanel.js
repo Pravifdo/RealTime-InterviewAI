@@ -195,7 +195,7 @@ export default function LiveEvaluationPanel({ socket, roomID, savedQuestions, te
                   <div className="expected-keywords">
                     <small>
                       <strong>Expected keywords (hidden during interview):</strong>{' '}
-                      {q.keywords.join(', ')}
+                      {Array.isArray(q.keywords) ? q.keywords.join(', ') : (q.keywords || 'None')}
                     </small>
                   </div>
                 )}

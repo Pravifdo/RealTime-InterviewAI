@@ -128,6 +128,15 @@ export default function JoinParticipant() {
       console.log('📝 New question received:', data);
       setCurrentQuestion(data.question);
       setCurrentQuestionIndex(data.questionIndex);
+      
+      // Store templateId if provided
+      if (data.templateId) {
+        setTemplateId(data.templateId);
+        console.log('📋 Template ID stored:', data.templateId);
+      } else {
+        console.warn('⚠️ No templateId in question data');
+      }
+      
       setQuestions(prev => {
         const updated = [...prev];
         updated[data.questionIndex] = data.question;
@@ -194,13 +203,22 @@ export default function JoinParticipant() {
   const sendAnswer = () => {
     if(!answer.trim()) return;
     
-    // Use the new flow (submit-answer event)
-    socket.emit("submit-answer", {
+    const submissionData = {
       answer: answer.trim(),
       questionIndex: currentQuestionIndex >= 0 ? currentQuestionIndex : questions.length - 1,
       roomId: roomID,
       templateId: templateId
+    };
+    
+    console.log('📤 Submitting answer:', {
+      questionIndex: submissionData.questionIndex,
+      roomId: submissionData.roomId,
+      templateId: submissionData.templateId,
+      hasAnswer: !!submissionData.answer
     });
+    
+    // Use the new flow (submit-answer event)
+    socket.emit("submit-answer", submissionData);
     
     console.log('📤 Answer submitted for question', currentQuestionIndex >= 0 ? currentQuestionIndex + 1 : questions.length);
     
@@ -513,7 +531,9 @@ export default function JoinParticipant() {
               questions.map((q, i) => (
                 <div key={i} className="question-item">
                   <div className="question-number">Q{i + 1}</div>
-                  <div className="question-text">{q}</div>
+                  <div className="question-text">
+                    {typeof q === 'string' ? q : (q?.question || JSON.stringify(q))}
+                  </div>
                 </div>
               ))
             )}
