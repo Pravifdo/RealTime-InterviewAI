@@ -1187,6 +1187,121 @@ export default function JoinParticipant() {
           text-align: center;
         }
 
+        /* Chat Panel Styles */
+        .chat-panel {
+          margin-top: 20px;
+        }
+
+        .chat-messages {
+          height: 400px;
+          overflow-y: auto;
+          padding: 16px;
+          background: #f7fafc;
+          border-radius: 12px;
+          margin-bottom: 16px;
+        }
+
+        .empty-chat {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          height: 100%;
+          color: #a0aec0;
+          text-align: center;
+        }
+
+        .empty-chat p {
+          font-size: 16px;
+          font-weight: 600;
+          margin: 0 0 8px 0;
+        }
+
+        .empty-chat span {
+          font-size: 14px;
+        }
+
+        .chat-message {
+          margin-bottom: 16px;
+          padding: 12px;
+          border-radius: 12px;
+          max-width: 70%;
+          animation: slideIn 0.3s ease;
+        }
+
+        @keyframes slideIn {
+          from {
+            opacity: 0;
+            transform: translateY(10px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+
+        .participant-message {
+          background: #667eea;
+          color: white;
+          margin-left: auto;
+        }
+
+        .interviewer-message {
+          background: white;
+          color: #2d3748;
+          border: 1px solid #e2e8f0;
+        }
+
+        .message-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 6px;
+          font-size: 12px;
+        }
+
+        .participant-message .message-header {
+          color: rgba(255, 255, 255, 0.9);
+        }
+
+        .interviewer-message .message-header {
+          color: #718096;
+        }
+
+        .sender-name {
+          font-weight: 700;
+        }
+
+        .message-time {
+          opacity: 0.8;
+        }
+
+        .message-content {
+          font-size: 14px;
+          line-height: 1.5;
+          word-wrap: break-word;
+        }
+
+        .chat-input-section {
+          display: flex;
+          gap: 12px;
+        }
+
+        .chat-input {
+          flex: 1;
+          padding: 14px;
+          border: 2px solid #e2e8f0;
+          border-radius: 12px;
+          font-family: inherit;
+          font-size: 14px;
+          transition: border-color 0.2s ease;
+        }
+
+        .chat-input:focus {
+          outline: none;
+          border-color: #667eea;
+        }
+
         /* Scrollbar Styling */
         .questions-list::-webkit-scrollbar {
           width: 6px;
