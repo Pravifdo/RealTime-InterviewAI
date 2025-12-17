@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import './TemplateManagement.css';
+import '../styles/TemplateManagement.css';
 
 export default function TemplateManagement() {
   const navigate = useNavigate();

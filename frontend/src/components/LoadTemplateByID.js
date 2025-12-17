@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import './LoadTemplateByID.css';
+import '../styles/LoadTemplateByID.css';
 
 export default function LoadTemplateByID({ socket, roomID, onTemplateLoaded }) {
   const [templateId, setTemplateId] = useState('');

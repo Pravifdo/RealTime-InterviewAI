@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import './PreInterviewSetup.css';
+import '../styles/PreInterviewSetup.css';
 
 export default function PreInterviewSetup({ socket, roomID, onSetupComplete }) {
   const [questions, setQuestions] = useState([

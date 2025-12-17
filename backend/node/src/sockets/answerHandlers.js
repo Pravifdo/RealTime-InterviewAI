@@ -9,7 +9,7 @@ const { evaluateAnswer } = require('../utils/keywordExtractor');
 const { evaluateAnswerWithAI } = require('../utils/aiEvaluator');
 
 module.exports = (io, socket) => {
-  // Submit answer event - evaluates with AI and saves to database
+  // Submit answer event - evaluates with AI using template
   socket.on('submit-answer', async (data) => {
     const { roomId, questionIndex, answer, templateId } = data;
     
@@ -21,7 +21,7 @@ module.exports = (io, socket) => {
     });
     
     try {
-      // Try to find by templateId first, then fall back to roomId
+      // Find template by templateId or roomId
       let template;
       if (templateId) {
         console.log(`🔍 Looking up template by ID: ${templateId}`);
@@ -29,7 +29,7 @@ module.exports = (io, socket) => {
       }
       
       if (!template) {
-        console.log(`🔍 Template not found by ID, trying roomId with status in-progress: ${roomId}`);
+        console.log(`🔍 Template not found by ID, trying roomId: ${roomId}`);
         template = await InterviewTemplate.findOne({ roomId, status: 'in-progress' });
       }
       
@@ -39,7 +39,7 @@ module.exports = (io, socket) => {
       }
       
       if (!template.questions[questionIndex]) {
-        console.error(`❌ Question index ${questionIndex} not found in template (has ${template.questions.length} questions)`);
+        console.error(`❌ Question index ${questionIndex} not found in template`);
         throw new Error('Question not found in template');
       }
       
@@ -48,7 +48,7 @@ module.exports = (io, socket) => {
       
       console.log(`🤖 Starting AI evaluation for Q${questionIndex + 1}...`);
       
-      // Use AI evaluation
+      // Use AI evaluation with Gemini
       const evaluation = await evaluateAnswerWithAI(
         question.question,
         answer,
@@ -61,7 +61,7 @@ module.exports = (io, socket) => {
         concepts: evaluation.matchedConcepts.length
       });
       
-      // Save to evaluation session
+      // Save to evaluation session database
       let session = await Evaluation.findOne({ roomId, status: 'ongoing' });
       
       if (!session) {
@@ -103,10 +103,11 @@ module.exports = (io, socket) => {
       
       console.log(`💾 AI Evaluation saved. Average score: ${session.averageScore}%`);
       
-      // Broadcast AI evaluation results to interviewer
+      // Broadcast AI evaluation results to interviewer and participant
       io.to(roomId).emit('answer-evaluated', {
         questionIndex,
         answer: answer,
+        question: question.question,
         score: evaluation.score,
         feedback: evaluation.feedback,
         strengths: evaluation.strengths,

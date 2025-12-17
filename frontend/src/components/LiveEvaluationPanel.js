@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import './LiveEvaluationPanel.css';
+import '../styles/LiveEvaluationPanel.css';
 
 export default function LiveEvaluationPanel({ socket, roomID, savedQuestions, templateId }) {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);

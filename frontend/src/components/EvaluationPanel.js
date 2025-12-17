@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import './EvaluationPanel.css';
+import '../styles/EvaluationPanel.css';
 
 export default function EvaluationPanel({ socket, roomID }) {
   const [questions, setQuestions] = useState([]);
