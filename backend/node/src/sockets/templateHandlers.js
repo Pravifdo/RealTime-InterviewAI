@@ -4,11 +4,15 @@
  */
 
 const InterviewTemplate = require('../models/InterviewTemplate');
+const { GoogleGenerativeAI } = require("@google/generative-ai");
+
+// Initialize Gemini AI
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || 'YOUR_API_KEY_HERE');
 
 module.exports = (io, socket) => {
-  // Load template by ID and assign to room
+  // Load template by ID and assign to room with Gemini AI processing
   socket.on('load-template-by-id', async (data) => {
-    const { templateId, roomId } = data;
+    const { templateId, roomId, processWithAI = true } = data;
     
     try {
       const template = await InterviewTemplate.findById(templateId);
@@ -24,6 +28,14 @@ module.exports = (io, socket) => {
       console.log(`📋 Loaded template "${template.title}" (ID: ${templateId}) for room ${roomId}`);
       console.log(`   Questions: ${template.questions.length}`);
       
+      // Process template with Gemini AI if requested
+      let aiAnalysis = null;
+      if (processWithAI) {
+        console.log('🤖 Processing template with Gemini AI...');
+        aiAnalysis = await analyzeTemplateWithAI(template);
+        console.log('✅ Gemini AI analysis complete');
+      }
+      
       socket.emit('template-loaded', {
         success: true,
         templateId: template._id,
@@ -34,7 +46,8 @@ module.exports = (io, socket) => {
           category: q.category,
           difficulty: q.difficulty
         })),
-        roomId: roomId
+        roomId: roomId,
+        aiAnalysis: aiAnalysis // Include AI insights
       });
       
     } catch (error) {
@@ -158,3 +171,70 @@ module.exports = (io, socket) => {
     }
   });
 };
+
+/**
+ * Analyze interview template with Gemini AI
+ * @param {Object} template - Interview template
+ * @returns {Object} - AI analysis with insights and suggestions
+ */
+async function analyzeTemplateWithAI(template) {
+  try {
+    const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+
+    const questionsText = template.questions.map((q, i) => 
+      `Q${i + 1}: ${q.question}\nKeywords: ${q.expectedKeywords.join(', ')}\nCategory: ${q.category}, Difficulty: ${q.difficulty}`
+    ).join('\n\n');
+
+    const prompt = `You are an expert technical interviewer. Analyze this interview template:
+
+Title: ${template.title}
+Total Questions: ${template.questions.length}
+
+Questions:
+${questionsText}
+
+Provide analysis in JSON format:
+{
+  "overall_assessment": "<brief assessment of the template quality>",
+  "difficulty_balance": "<comment on difficulty distribution>",
+  "coverage": "<what technical areas are covered>",
+  "suggestions": ["<suggestion 1>", "<suggestion 2>"],
+  "estimated_duration": "<estimated time in minutes>",
+  "strengths": ["<strength 1>", "<strength 2>"]
+}`;
+
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    const text = response.text();
+    
+    // Parse JSON response
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      throw new Error('Could not parse AI response');
+    }
+    
+    const analysis = JSON.parse(jsonMatch[0]);
+    
+    return {
+      overallAssessment: analysis.overall_assessment,
+      difficultyBalance: analysis.difficulty_balance,
+      coverage: analysis.coverage,
+      suggestions: analysis.suggestions || [],
+      estimatedDuration: analysis.estimated_duration,
+      strengths: analysis.strengths || [],
+      processedBy: 'Gemini AI'
+    };
+    
+  } catch (error) {
+    console.error('❌ Template AI Analysis Error:', error.message);
+    return {
+      overallAssessment: 'AI analysis unavailable',
+      difficultyBalance: 'Not analyzed',
+      coverage: 'Not analyzed',
+      suggestions: [],
+      estimatedDuration: `${template.questions.length * 5} minutes (estimated)`,
+      strengths: [],
+      processedBy: 'Fallback (AI unavailable)'
+    };
+  }
+}

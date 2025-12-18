@@ -129,6 +129,7 @@ export default function JoinParticipant() {
       console.log('📝 New question received:', data);
       setCurrentQuestion(data.question);
       setCurrentQuestionIndex(data.questionIndex);
+      console.log('📝 New question received with templateId:',data.templateId);
       
       // Store templateId if provided
       if (data.templateId) {

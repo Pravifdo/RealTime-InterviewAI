@@ -46,20 +46,25 @@ module.exports = (io, socket) => {
       const question = template.questions[questionIndex];
       const expectedKeywords = question.expectedKeywords;
       
-      console.log(`🤖 Starting AI evaluation for Q${questionIndex + 1}...`);
+      console.log(`\n🎯 ===== GEMINI AI EVALUATION FLOW =====`);
+      console.log(`📋 Template: ${template.title}`);
+      console.log(`❓ Question ${questionIndex + 1}: ${question.question}`);
+      console.log(`🔑 Template Keywords:`, expectedKeywords);
+      console.log(`💬 Participant Answer:`, answer.substring(0, 100) + '...');
+      console.log(`🤖 Sending to Gemini AI for evaluation...`);
       
-      // Use AI evaluation with Gemini
+      // Use AI evaluation with Gemini (passes template keywords to AI)
       const evaluation = await evaluateAnswerWithAI(
         question.question,
         answer,
         expectedKeywords
       );
       
-      console.log(`✨ AI Evaluation complete for Q${questionIndex + 1}:`, {
-        score: evaluation.score,
-        type: evaluation.evaluationType,
-        concepts: evaluation.matchedConcepts.length
-      });
+      console.log(`✅ Gemini AI Evaluation complete for Q${questionIndex + 1}:`);
+      console.log(`   📊 Score: ${evaluation.score}/100`);
+      console.log(`   🎯 Matched Keywords:`, evaluation.matchedConcepts);
+      console.log(`   ⚙️ Evaluation Type: ${evaluation.evaluationType}`);
+      console.log(`🎯 ===== END EVALUATION =====\n`);
       
       // Save to evaluation session database
       let session = await Evaluation.findOne({ roomId, status: 'ongoing' });
@@ -103,11 +108,12 @@ module.exports = (io, socket) => {
       
       console.log(`💾 AI Evaluation saved. Average score: ${session.averageScore}%`);
       
-      // Broadcast AI evaluation results to interviewer and participant
+      // Broadcast Gemini AI evaluation results to BOTH interviewer and participant
       io.to(roomId).emit('answer-evaluated', {
         questionIndex,
         answer: answer,
         question: question.question,
+        templateKeywords: expectedKeywords,
         score: evaluation.score,
         feedback: evaluation.feedback,
         strengths: evaluation.strengths,
@@ -115,8 +121,12 @@ module.exports = (io, socket) => {
         matchedConcepts: evaluation.matchedConcepts,
         evaluationType: evaluation.evaluationType,
         averageScore: session.averageScore,
-        totalQuestions: session.questionsAnswers.filter(qa => qa.participantAnswer).length
+        totalQuestions: session.questionsAnswers.filter(qa => qa.participantAnswer).length,
+        processedByAI: 'Gemini AI',
+        keywordsChecked: true
       });
+      
+      console.log(`📡 Gemini AI results broadcast to room ${roomId} (Interviewer + Participant)`);
       
       // Confirm to participant
       socket.emit('answer-submitted', {

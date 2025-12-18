@@ -61,15 +61,20 @@ module.exports = (io, socket) => {
         
         await template.save();
         templateId = template._id.toString();
+        console.log("Template ID:", templateId);
         console.log(`✅ Question saved to template (Q${questionIndex + 1}, ID: ${templateId}) for room: ${roomId}`);
+        console.log(`🔑 Keywords for Gemini AI evaluation:`, questionData.keywords);
         
-        // Emit receive-question with templateId
+        // Emit receive-question with templateId (keywords saved for Gemini AI evaluation)
         io.to(roomId).emit('receive-question', {
           questionIndex,
           question: questionData.question,
           totalQuestions: template.questions.length,
-          templateId: templateId
+          templateId :templateId,
+          hasKeywords: questionData.keywords.length > 0
         });
+        
+        console.log(`📤 Question sent to room ${roomId} - Ready for answer → Gemini AI evaluation`);
         
       } catch (error) {
         console.error("Error saving question to template:", error);
@@ -140,6 +145,8 @@ module.exports = (io, socket) => {
       }
       
       await template.save();
+      templateId = template._id.toString();
+      console.log("Template ID create:", templateId);
       console.log(`✅ Question saved to both Evaluation and Template (Q${questionIndex + 1})`);
       
     } catch (error) {
