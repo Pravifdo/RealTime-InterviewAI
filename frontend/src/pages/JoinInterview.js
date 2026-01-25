@@ -40,6 +40,7 @@ export default function JoinInterview() {
   const [templateId, setTemplateId] = useState(null);
   const [questionsAsked, setQuestionsAsked] = useState([]);
   const [participantAnswers, setParticipantAnswers] = useState([]);
+  const [evaluatingIndex, setEvaluatingIndex] = useState(null);  // Track which answer is being evaluated
 
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
@@ -136,25 +137,65 @@ export default function JoinInterview() {
       }, 500);
     });
 
-    // Listen for participant answers
+    // Listen for participant answers (direct answer - no evaluation yet)
+    socket.on("participant-answer-received", (data) => {
+      console.log('📨 Direct answer received from participant:', data);
+      setParticipantAnswers(prev => {
+        const updated = [...prev];
+        // Store the answer with evaluated: false flag
+        updated[data.questionIndex] = {
+          answer: data.answer,
+          questionIndex: data.questionIndex,
+          timestamp: data.timestamp,
+          evaluated: false,  // Not evaluated yet - show "Evaluate" button
+          score: null,
+          feedback: null
+        };
+        return updated;
+      });
+    });
+
+    // Listen for participant answers submission confirmation
     socket.on("answer-submitted", (data) => {
       if (data.success) {
         console.log('✅ Participant submitted answer for Q' + (data.questionIndex + 1));
       }
     });
 
+    // Listen for evaluation started (show loading state)
+    socket.on("evaluation-started", (data) => {
+      console.log('🔄 Evaluation started for Q' + (data.questionIndex + 1));
+      setEvaluatingIndex(data.questionIndex);
+    });
+
+    // Listen for AI evaluation results
     socket.on("answer-evaluated", (data) => {
-      console.log('📊 Answer evaluated:', data);
+      console.log('📊 Answer evaluated by Gemini AI:', data);
+      setEvaluatingIndex(null);  // Clear loading state
       setParticipantAnswers(prev => {
         const updated = [...prev];
         updated[data.questionIndex] = {
-          answer: data.answer || 'No answer provided',
+          ...updated[data.questionIndex],
+          answer: data.answer || updated[data.questionIndex]?.answer || 'No answer provided',
           score: data.score,
+          points: data.points,
           feedback: data.feedback,
+          strengths: data.strengths || [],
+          improvements: data.improvements || [],
+          matchedConcepts: data.matchedConcepts || [],
+          expectedKeywords: data.expectedKeywords || [],
+          evaluated: true,
           questionIndex: data.questionIndex
         };
         return updated;
       });
+    });
+
+    // Listen for evaluation errors
+    socket.on("evaluation-error", (data) => {
+      console.error('❌ Evaluation error for Q' + (data.questionIndex + 1) + ':', data.error);
+      setEvaluatingIndex(null);
+      alert('Evaluation failed: ' + data.error);
     });
 
     return () => {
@@ -162,8 +203,11 @@ export default function JoinInterview() {
       socket.off("meeting-status");
       socket.off("meeting-started");
       socket.off("meeting-ended");
+      socket.off("participant-answer-received");
       socket.off("answer-submitted");
+      socket.off("evaluation-started");
       socket.off("answer-evaluated");
+      socket.off("evaluation-error");
     };
   }, []);
 
@@ -217,6 +261,27 @@ export default function JoinInterview() {
     
     setQuestion("");
     console.log('📤 Question sent to participant in room:', roomID);
+  };
+
+  // Evaluate answer using Gemini AI (on-demand)
+  const evaluateAnswer = (questionIndex) => {
+    const answerData = participantAnswers[questionIndex];
+    const questionData = questionsAsked[questionIndex];
+    
+    if (!answerData || !answerData.answer) {
+      alert('No answer to evaluate!');
+      return;
+    }
+    
+    console.log('🤖 Requesting AI evaluation for Q' + (questionIndex + 1));
+    
+    socket.emit('evaluate-answer', {
+      roomId: roomID,
+      questionIndex: questionIndex,
+      answer: answerData.answer,
+      question: questionData?.question || '',
+      templateId: templateId
+    });
   };
 
   const startMeeting = () => {
@@ -590,20 +655,120 @@ export default function JoinInterview() {
                   <div className="answer-section">
                     <div className="answer-label">
                       <span className="a-badge">Answer</span>
-                      {participantAnswers[index].score !== undefined && (
-                        <span className="score-badge" style={{
-                          background: participantAnswers[index].score >= 70 ? '#48bb78' : 
-                                      participantAnswers[index].score >= 50 ? '#ed8936' : '#f56565'
-                        }}>
-                          Score: {participantAnswers[index].score}%
-                        </span>
+                      {participantAnswers[index].evaluated && participantAnswers[index].score !== null && (
+                        <>
+                          <span className="score-badge" style={{
+                            background: participantAnswers[index].score >= 70 ? '#48bb78' : 
+                                        participantAnswers[index].score >= 50 ? '#ed8936' : '#f56565'
+                          }}>
+                            Score: {participantAnswers[index].score}%
+                          </span>
+                          <span className="points-badge">
+                            {participantAnswers[index].points || Math.round(participantAnswers[index].score / 10)}/10 Points
+                          </span>
+                        </>
                       )}
                     </div>
                     <div className="answer-text">{participantAnswers[index].answer}</div>
-                    {participantAnswers[index].feedback && (
-                      <div className="ai-feedback-box">
-                        <strong>AI Feedback:</strong>
-                        <p>{participantAnswers[index].feedback}</p>
+                    
+                    {/* Show Evaluate Button if not evaluated yet */}
+                    {!participantAnswers[index].evaluated && (
+                      <div className="evaluate-section">
+                        <button 
+                          className={`evaluate-btn ${evaluatingIndex === index ? 'evaluating' : ''}`}
+                          onClick={() => evaluateAnswer(index)}
+                          disabled={evaluatingIndex === index}
+                        >
+                          {evaluatingIndex === index ? (
+                            <>
+                              <span className="spinner"></span>
+                              Evaluating with AI...
+                            </>
+                          ) : (
+                            <>
+                              🤖 Evaluate with Gemini AI
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    )}
+                    
+                    {/* Show AI Evaluation Results */}
+                    {participantAnswers[index].evaluated && (
+                      <div className="evaluation-results">
+                        {/* Score Visualization */}
+                        <div className="score-visual">
+                          <div className="score-circle" style={{
+                            background: `conic-gradient(
+                              ${participantAnswers[index].score >= 70 ? '#48bb78' : 
+                                participantAnswers[index].score >= 50 ? '#ed8936' : '#f56565'} 
+                              ${participantAnswers[index].score * 3.6}deg, 
+                              #e2e8f0 0deg
+                            )`
+                          }}>
+                            <div className="score-inner">
+                              <span className="score-number">{participantAnswers[index].score}</span>
+                              <span className="score-label">%</span>
+                            </div>
+                          </div>
+                          <div className="score-details">
+                            <div className="detail-item">
+                              <span className="detail-label">Points:</span>
+                              <span className="detail-value">{participantAnswers[index].points || Math.round(participantAnswers[index].score / 10)}/10</span>
+                            </div>
+                            <div className="detail-item">
+                              <span className="detail-label">Status:</span>
+                              <span className={`detail-value status-${participantAnswers[index].score >= 70 ? 'pass' : participantAnswers[index].score >= 50 ? 'fair' : 'fail'}`}>
+                                {participantAnswers[index].score >= 70 ? '✅ Good' : 
+                                 participantAnswers[index].score >= 50 ? '⚠️ Fair' : '❌ Needs Work'}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                        
+                        {/* AI Feedback */}
+                        {participantAnswers[index].feedback && (
+                          <div className="ai-feedback-box">
+                            <strong>🤖 AI Feedback:</strong>
+                            <p>{participantAnswers[index].feedback}</p>
+                          </div>
+                        )}
+                        
+                        {/* Strengths */}
+                        {participantAnswers[index].strengths && participantAnswers[index].strengths.length > 0 && (
+                          <div className="strengths-box">
+                            <strong>✅ Strengths:</strong>
+                            <ul>
+                              {participantAnswers[index].strengths.map((s, i) => (
+                                <li key={i}>{s}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                        
+                        {/* Improvements */}
+                        {participantAnswers[index].improvements && participantAnswers[index].improvements.length > 0 && (
+                          <div className="improvements-box">
+                            <strong>📈 Areas to Improve:</strong>
+                            <ul>
+                              {participantAnswers[index].improvements.map((imp, i) => (
+                                <li key={i}>{imp}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                        
+                        {/* Matched Concepts */}
+                        {participantAnswers[index].matchedConcepts && participantAnswers[index].matchedConcepts.length > 0 && (
+                          <div className="concepts-box">
+                            <strong>🎯 Concepts Covered:</strong>
+                            <div className="concepts-tags">
+                              {participantAnswers[index].matchedConcepts.map((concept, i) => (
+                                <span key={i} className="concept-tag">{concept}</span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -636,6 +801,9 @@ export default function JoinInterview() {
           roomID={roomID} 
           savedQuestions={savedQuestions}
           templateId={templateId}
+          onQuestionAsked={(questionData) => {
+            setQuestionsAsked(prev => [...prev, questionData]);
+          }}
         />
       )}
 
@@ -1305,6 +1473,7 @@ export default function JoinInterview() {
           align-items: center;
           gap: 12px;
           margin-bottom: 8px;
+          flex-wrap: wrap;
         }
 
         .a-badge {
@@ -1324,6 +1493,15 @@ export default function JoinInterview() {
           font-size: 12px;
         }
 
+        .points-badge {
+          background: #667eea;
+          color: white;
+          padding: 6px 12px;
+          border-radius: 6px;
+          font-weight: 600;
+          font-size: 12px;
+        }
+
         .answer-text {
           padding: 12px;
           background: #f0fff4;
@@ -1334,6 +1512,144 @@ export default function JoinInterview() {
           line-height: 1.6;
           white-space: pre-wrap;
           word-wrap: break-word;
+        }
+
+        /* Evaluate Button Section */
+        .evaluate-section {
+          margin-top: 16px;
+          text-align: center;
+        }
+
+        .evaluate-btn {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 10px;
+          padding: 14px 28px;
+          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          color: white;
+          border: none;
+          border-radius: 10px;
+          font-size: 16px;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.3s ease;
+          box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .evaluate-btn:hover:not(:disabled) {
+          transform: translateY(-2px);
+          box-shadow: 0 6px 20px rgba(102, 126, 234, 0.5);
+        }
+
+        .evaluate-btn:disabled {
+          opacity: 0.7;
+          cursor: not-allowed;
+        }
+
+        .evaluate-btn.evaluating {
+          background: #a0aec0;
+        }
+
+        .spinner {
+          width: 18px;
+          height: 18px;
+          border: 3px solid rgba(255, 255, 255, 0.3);
+          border-top: 3px solid white;
+          border-radius: 50%;
+          animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+
+        /* Evaluation Results */
+        .evaluation-results {
+          margin-top: 16px;
+          padding: 20px;
+          background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%);
+          border-radius: 12px;
+          border: 1px solid #e2e8f0;
+        }
+
+        .score-visual {
+          display: flex;
+          align-items: center;
+          gap: 24px;
+          margin-bottom: 20px;
+          padding-bottom: 20px;
+          border-bottom: 1px solid #e2e8f0;
+        }
+
+        .score-circle {
+          width: 100px;
+          height: 100px;
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          position: relative;
+        }
+
+        .score-inner {
+          width: 80px;
+          height: 80px;
+          background: white;
+          border-radius: 50%;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .score-number {
+          font-size: 28px;
+          font-weight: 700;
+          color: #2d3748;
+          line-height: 1;
+        }
+
+        .score-label {
+          font-size: 14px;
+          color: #718096;
+        }
+
+        .score-details {
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+        }
+
+        .detail-item {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+
+        .detail-label {
+          font-size: 14px;
+          color: #718096;
+        }
+
+        .detail-value {
+          font-size: 14px;
+          font-weight: 600;
+          color: #2d3748;
+        }
+
+        .detail-value.status-pass {
+          color: #48bb78;
+        }
+
+        .detail-value.status-fair {
+          color: #ed8936;
+        }
+
+        .detail-value.status-fail {
+          color: #f56565;
         }
 
         .ai-feedback-box {
@@ -1356,6 +1672,90 @@ export default function JoinInterview() {
           color: #2d3748;
           font-size: 13px;
           line-height: 1.5;
+        }
+
+        .strengths-box {
+          margin-top: 12px;
+          padding: 12px;
+          background: #f0fff4;
+          border-left: 4px solid #48bb78;
+          border-radius: 8px;
+        }
+
+        .strengths-box strong {
+          color: #276749;
+          display: block;
+          margin-bottom: 6px;
+          font-size: 13px;
+        }
+
+        .strengths-box ul {
+          margin: 0;
+          padding-left: 20px;
+        }
+
+        .strengths-box li {
+          color: #2d3748;
+          font-size: 13px;
+          line-height: 1.5;
+          margin-bottom: 4px;
+        }
+
+        .improvements-box {
+          margin-top: 12px;
+          padding: 12px;
+          background: #fffbeb;
+          border-left: 4px solid #ed8936;
+          border-radius: 8px;
+        }
+
+        .improvements-box strong {
+          color: #c05621;
+          display: block;
+          margin-bottom: 6px;
+          font-size: 13px;
+        }
+
+        .improvements-box ul {
+          margin: 0;
+          padding-left: 20px;
+        }
+
+        .improvements-box li {
+          color: #2d3748;
+          font-size: 13px;
+          line-height: 1.5;
+          margin-bottom: 4px;
+        }
+
+        .concepts-box {
+          margin-top: 12px;
+          padding: 12px;
+          background: #faf5ff;
+          border-left: 4px solid #805ad5;
+          border-radius: 8px;
+        }
+
+        .concepts-box strong {
+          color: #553c9a;
+          display: block;
+          margin-bottom: 8px;
+          font-size: 13px;
+        }
+
+        .concepts-tags {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 8px;
+        }
+
+        .concept-tag {
+          background: #e9d8fd;
+          color: #553c9a;
+          padding: 4px 10px;
+          border-radius: 20px;
+          font-size: 12px;
+          font-weight: 500;
         }
 
         .waiting-answer {

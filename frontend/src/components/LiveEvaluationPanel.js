@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import '../styles/LiveEvaluationPanel.css';
 
-export default function LiveEvaluationPanel({ socket, roomID, savedQuestions, templateId }) {
+export default function LiveEvaluationPanel({ socket, roomID, savedQuestions, templateId, onQuestionAsked }) {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [evaluations, setEvaluations] = useState([]);
   const [averageScore, setAverageScore] = useState(0);
@@ -51,14 +51,29 @@ export default function LiveEvaluationPanel({ socket, roomID, savedQuestions, te
       return;
     }
 
-    socket.emit('ask-question', {
+    const questionData = {
       roomId: roomID,
       questionIndex: index,
       templateId: templateId
-    });
+    };
+    
+    console.log('📤 Emitting ask-question event:', questionData);
+    console.log('📤 Socket connected:', socket?.connected);
+    console.log('📤 Socket ID:', socket?.id);
+    
+    socket.emit('ask-question', questionData);
 
     setCurrentQuestionIndex(index);
     console.log(`Asking question ${index + 1} (Template ID: ${templateId})`);
+    
+    // Notify parent component that a question was asked
+    if (onQuestionAsked) {
+      onQuestionAsked({
+        question: savedQuestions[index].question,
+        timestamp: new Date(),
+        index: askedQuestions.length
+      });
+    }
   };
 
   const askNextQuestion = () => {

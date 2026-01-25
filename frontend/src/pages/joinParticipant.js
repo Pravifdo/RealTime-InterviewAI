@@ -26,7 +26,7 @@ export default function JoinParticipant() {
   const [questions, setQuestions] = useState([]);
   const [currentQuestion, setCurrentQuestion] = useState(null);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(-1);
-  const [templateId, setTemplateId] = useState(null);
+  const [questionTemplateIds, setQuestionTemplateIds] = useState({});  // Track templateId per question
   const [interviewerState, setInterviewerState] = useState({ camOn: true, micOn: true });
   const [roomID, setRoomID] = useState('');
   const [roomIDInput, setRoomIDInput] = useState('');
@@ -127,14 +127,22 @@ export default function JoinParticipant() {
     // Listen for questions asked during interview (new flow)
     socket.on("receive-question", (data) => {
       console.log('📝 New question received:', data);
+      console.log('📝 Full data object:', JSON.stringify(data));
       setCurrentQuestion(data.question);
       setCurrentQuestionIndex(data.questionIndex);
-      console.log('📝 New question received with templateId:',data.templateId);
+      console.log('📝 New question received with templateId:', data.templateId);
       
-      // Store templateId if provided
+      // Store templateId for this specific question
       if (data.templateId) {
-        setTemplateId(data.templateId);
-        console.log('📋 Template ID stored:', data.templateId);
+        setQuestionTemplateIds(prev => {
+          const updated = {
+            ...prev,
+            [data.questionIndex]: data.templateId
+          };
+          console.log('📋 Updated questionTemplateIds:', updated);
+          return updated;
+        });
+        console.log('📋 Template ID stored for Q' + (data.questionIndex + 1) + ':', data.templateId);
       } else {
         console.warn('⚠️ No templateId in question data');
       }
@@ -150,6 +158,14 @@ export default function JoinParticipant() {
     socket.on("answer-submitted", (data) => {
       if (data.success) {
         console.log('✅ Answer submitted successfully');
+        // Store the templateId if returned (for future answers)
+        if (data.templateId) {
+          setQuestionTemplateIds(prev => ({
+            ...prev,
+            [data.questionIndex]: data.templateId
+          }));
+          console.log('📋 Template ID received from server:', data.templateId);
+        }
         setAnswer('');
         resetTranscript();
       } else {
@@ -205,11 +221,23 @@ export default function JoinParticipant() {
   const sendAnswer = () => {
     if(!answer.trim()) return;
     
+    const qIndex = currentQuestionIndex >= 0 ? currentQuestionIndex : questions.length - 1;
+    const currentTemplateId = questionTemplateIds[qIndex];
+    
+    console.log('📊 Current state before submit:', {
+      currentQuestionIndex,
+      qIndex,
+      questionsLength: questions.length,
+      questionTemplateIds,
+      currentTemplateId
+    });
+    
     const submissionData = {
       answer: answer.trim(),
-      questionIndex: currentQuestionIndex >= 0 ? currentQuestionIndex : questions.length - 1,
+      questionIndex: qIndex,
       roomId: roomID,
-      templateId: templateId
+      templateId: currentTemplateId,
+      question: currentQuestion || questions[qIndex]
     };
     
     console.log('📤 Submitting answer:', {
@@ -222,7 +250,15 @@ export default function JoinParticipant() {
     // Use the new flow (submit-answer event)
     socket.emit("submit-answer", submissionData);
     
-    console.log('📤 Answer submitted for question', currentQuestionIndex >= 0 ? currentQuestionIndex + 1 : questions.length);
+    // Also emit answer directly to interviewer for immediate display
+    socket.emit("participant-answer", {
+      answer: answer.trim(),
+      questionIndex: qIndex,
+      roomId: roomID,
+      question: currentQuestion || questions[qIndex]
+    });
+    
+    console.log('📤 Answer submitted for question', qIndex + 1);
     
     // Note: Answer will be cleared by the answer-submitted event listener
   };

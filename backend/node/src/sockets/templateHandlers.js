@@ -135,12 +135,19 @@ module.exports = (io, socket) => {
   socket.on('ask-question', async (data) => {
     const { roomId, questionIndex, templateId } = data;
     
+    console.log(`📝 ask-question received:`, { roomId, questionIndex, templateId });
+    
     try {
       // Try to find by templateId first, then fall back to roomId
       let template;
       if (templateId) {
+        console.log(`🔍 Looking for template by ID: ${templateId}`);
         template = await InterviewTemplate.findById(templateId);
+        if (template) {
+          console.log(`✅ Found template: ${template.title}`);
+        }
       } else {
+        console.log(`🔍 Looking for template by roomId: ${roomId}`);
         template = await InterviewTemplate.findOne({ roomId });
       }
       
@@ -150,15 +157,22 @@ module.exports = (io, socket) => {
         console.log(`📝 Asking question ${questionIndex + 1}:`, question.question);
         console.log(`🔑 Expected keywords (hidden from interviewer):`, question.expectedKeywords);
         
+        // Determine the templateId to send
+        const templateIdToSend = templateId || template._id.toString();
+        console.log(`📤 Sending receive-question with templateId: ${templateIdToSend}`);
+        
         // Send question to participant (without keywords)
         io.to(roomId).emit('receive-question', {
           questionIndex,
           question: question.question,
           totalQuestions: template.questions.length,
-          templateId: templateId || template._id.toString()
+          templateId: templateIdToSend
         });
         
+        console.log(`✅ Question sent to room ${roomId}`);
+        
       } else {
+        console.error(`❌ Question not found - template: ${!!template}, questionIndex: ${questionIndex}`);
         socket.emit('question-error', {
           message: 'Question not found in template'
         });
@@ -179,7 +193,7 @@ module.exports = (io, socket) => {
  */
 async function analyzeTemplateWithAI(template) {
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
     const questionsText = template.questions.map((q, i) => 
       `Q${i + 1}: ${q.question}\nKeywords: ${q.expectedKeywords.join(', ')}\nCategory: ${q.category}, Difficulty: ${q.difficulty}`

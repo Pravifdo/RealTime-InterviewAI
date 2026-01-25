@@ -23,6 +23,11 @@ module.exports = (io) => {
   io.on('connection', (socket) => {
     console.log(`✅ User connected: ${socket.id} from ${socket.handshake.address}`);
 
+    // DEBUG: Log ALL incoming events
+    socket.onAny((eventName, ...args) => {
+      console.log(`🔵 [${socket.id}] Event received: ${eventName}`, JSON.stringify(args).substring(0, 200));
+    });
+
     // Register all event handlers
     webrtcHandlers(io, socket);
     meetingHandlers(io, socket);

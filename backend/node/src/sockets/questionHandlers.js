@@ -70,7 +70,7 @@ module.exports = (io, socket) => {
           questionIndex,
           question: questionData.question,
           totalQuestions: template.questions.length,
-          templateId :templateId,
+          templateId: templateId,
           hasKeywords: questionData.keywords.length > 0
         });
         
@@ -82,9 +82,6 @@ module.exports = (io, socket) => {
     } else {
       console.warn("⚠️ No roomId found, question not saved to template");
     }
-    
-    // Emit old-flow event for backward compatibility
-    io.emit('new-question', questionData);
   });
 
   // Save question with keywords (legacy event)

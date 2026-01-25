@@ -12,7 +12,7 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || 'YOUR_API_KEY
  */
 async function evaluateAnswerWithAI(question, answer, expectedKeywords = []) {
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
     const prompt = `You are an expert technical interviewer evaluating a candidate's answer.
 
@@ -89,7 +89,7 @@ Respond ONLY with valid JSON in this exact format:
  */
 async function generateInterviewSummary(questionsAndAnswers) {
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
     const qaText = questionsAndAnswers.map((qa, i) => 
       `Q${i + 1}: ${qa.question}\nAnswer: ${qa.answer}\nScore: ${qa.score}%`
