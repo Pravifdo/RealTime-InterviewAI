@@ -38,10 +38,15 @@ export const useWebRTC = (socket, roomId, isInitiator) => {
   const peerConnectionRef = useRef(null);
   const localStreamRef = useRef(null);
   const remoteStreamRef = useRef(null);
+  const desiredVideoEnabledRef = useRef(true);
+  const desiredAudioEnabledRef = useRef(true);
 
   // Initialize local media stream
   const initLocalStream = async (videoEnabled = true, audioEnabled = true) => {
     try {
+      desiredVideoEnabledRef.current = videoEnabled;
+      desiredAudioEnabledRef.current = audioEnabled;
+
       // Check if mediaDevices API is available
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
         console.error('getUserMedia is not supported in this browser/context');
@@ -57,6 +62,14 @@ export const useWebRTC = (socket, roomId, isInitiator) => {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: videoEnabled,
         audio: audioEnabled,
+      });
+
+      // Ensure stream tracks always match desired UI state.
+      stream.getVideoTracks().forEach((track) => {
+        track.enabled = desiredVideoEnabledRef.current;
+      });
+      stream.getAudioTracks().forEach((track) => {
+        track.enabled = desiredAudioEnabledRef.current;
       });
       
       localStreamRef.current = stream;
@@ -216,6 +229,7 @@ export const useWebRTC = (socket, roomId, isInitiator) => {
 
   // Toggle video track
   const toggleVideo = (enabled) => {
+    desiredVideoEnabledRef.current = enabled;
     if (localStreamRef.current) {
       localStreamRef.current.getVideoTracks().forEach((track) => {
         track.enabled = enabled;
@@ -225,6 +239,7 @@ export const useWebRTC = (socket, roomId, isInitiator) => {
 
   // Toggle audio track
   const toggleAudio = (enabled) => {
+    desiredAudioEnabledRef.current = enabled;
     if (localStreamRef.current) {
       localStreamRef.current.getAudioTracks().forEach((track) => {
         track.enabled = enabled;

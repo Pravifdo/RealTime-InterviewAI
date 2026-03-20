@@ -97,6 +97,13 @@ export default function JoinParticipant() {
     }
   }, [localStream]);
 
+  // Keep actual track state aligned with UI state if stream is recreated.
+  useEffect(() => {
+    if (!localStream) return;
+    toggleAudio(micOn);
+    toggleVideo(camOn);
+  }, [localStream, micOn, camOn, toggleAudio, toggleVideo]);
+
   // Update remote video element
   useEffect(() => {
     if (remoteVideoRef.current && remoteStream) {
@@ -208,6 +215,9 @@ export default function JoinParticipant() {
     const newMicState = !micOn;
     setMicOn(newMicState);
     toggleAudio(newMicState);
+    if (!newMicState && isListening) {
+      stopListening();
+    }
     socket.emit("participant-toggle", { micOn: newMicState, camOn });
   };
 

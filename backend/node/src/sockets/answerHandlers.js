@@ -5,7 +5,7 @@
 
 const Evaluation = require('../models/Evaluation');
 const InterviewTemplate = require('../models/InterviewTemplate');
-const { evaluateAnswer } = require('../utils/keywordExtractor');
+const { evaluateAnswer, extractKeywords } = require('../utils/keywordExtractor');
 const { evaluateAnswerWithAI } = require('../utils/aiEvaluator');
 
 module.exports = (io, socket) => {
@@ -148,18 +148,33 @@ module.exports = (io, socket) => {
     console.log(`📋 Room: ${roomId}, Question: ${questionIndex + 1}`);
     
     try {
-      // Find template for expected keywords
+      // Find best template candidate for expected keywords.
       let template;
       if (templateId) {
         template = await InterviewTemplate.findById(templateId);
       }
-      if (!template) {
+      if (!template || !template?.questions?.[questionIndex]) {
         template = await InterviewTemplate.findOne({ roomId, status: 'in-progress' });
       }
-      
+      if (!template || !template?.questions?.[questionIndex]) {
+        template = await InterviewTemplate.findOne({ roomId });
+      }
+
       const templateQuestion = template?.questions?.[questionIndex];
-      const expectedKeywords = templateQuestion?.expectedKeywords || [];
-      const questionText = templateQuestion?.question || question;
+
+      // Fallback to saved evaluation session data when question isn't in selected template.
+      let session = await Evaluation.findOne({ roomId, status: 'ongoing' });
+      const sessionQuestion = session?.questionsAnswers?.[questionIndex];
+
+      const questionText = templateQuestion?.question || sessionQuestion?.question || question || `Question ${questionIndex + 1}`;
+
+      let expectedKeywords = templateQuestion?.expectedKeywords || sessionQuestion?.expectedKeywords || [];
+
+      // For ad-hoc/extra questions, auto-generate keywords from the question text.
+      if (!expectedKeywords || expectedKeywords.length === 0) {
+        expectedKeywords = extractKeywords(questionText).slice(0, 8);
+      }
+      
       
       console.log(`❓ Question: ${questionText}`);
       console.log(`🔑 Expected Keywords:`, expectedKeywords);
@@ -188,8 +203,9 @@ module.exports = (io, socket) => {
       const points = Math.round(evaluation.score / 10);
       
       // Update evaluation session in database
-      let session = await Evaluation.findOne({ roomId, status: 'ongoing' });
       if (session && session.questionsAnswers[questionIndex]) {
+        session.questionsAnswers[questionIndex].question = questionText;
+        session.questionsAnswers[questionIndex].expectedKeywords = expectedKeywords;
         session.questionsAnswers[questionIndex].score = evaluation.score;
         session.questionsAnswers[questionIndex].aiFeedback = evaluation.feedback;
         session.questionsAnswers[questionIndex].aiStrengths = evaluation.strengths;
